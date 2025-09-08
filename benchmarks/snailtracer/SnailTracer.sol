@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 // This contract is a slightly modified version of Péter Szilágyi's snailtracer.sol, licensed under GPL-3.0
 // https://github.com/karalabe/snailtracer
+pragma solidity ^0.8.0;
 
 contract SnailTracer {
   // Image properties for the path tracer
@@ -18,20 +19,20 @@ contract SnailTracer {
   // TracePixel traces a single pixel of the configured image and returns the RGB
   // values to the caller. This method is meant to be used specifically for high
   // SPP renderings which would have a huge overhead otherwise.
-  function TracePixel(int x, int y, int spp) constant returns (byte r, byte g, byte b) {
+  function TracePixel(int x, int y, int spp) public view returns (bytes1 r, bytes1 g, bytes1 b) {
     Vector memory color = trace(x, y, spp);
-    return (byte(color.x), byte(color.y), byte(color.z));
+    return (bytes1(uint8(uint(color.x))), bytes1(uint8(uint(color.y))), bytes1(uint8(uint(color.z))));
   }
   // TraceScanline traces a single horizontal scanline of the configured image and
   // returns the RGB pixel value array. This method should be used for lower SPP
   // rendering to void the overhead of by-pixel EVM calls.
-  function TraceScanline(int y, int spp) constant returns (bytes) {
+  function TraceScanline(int y, int spp) public view returns (bytes memory) {
     for (int x = 0; x < width; x++) {
       Vector memory color = trace(x, y, spp);
 
-      buffer.push(byte(color.x));
-      buffer.push(byte(color.y));
-      buffer.push(byte(color.z));
+      buffer = abi.encodePacked(buffer, bytes1(uint8(uint(color.x))));
+      buffer = abi.encodePacked(buffer, bytes1(uint8(uint(color.y))));
+      buffer = abi.encodePacked(buffer, bytes1(uint8(uint(color.z))));
     }
     return buffer;
   }
@@ -39,21 +40,21 @@ contract SnailTracer {
   // RGB pixel value array containing all the data top-down, left-to-right. This
   // method should only be callsed for very small images and SPP values as the
   // cumulative gas and memory costs can push the EVM too hard.
-  function TraceImage(int spp) constant returns (bytes) {
+  function TraceImage(int spp) public view returns (bytes memory) {
     for (int y = height - 1; y >= 0; y--) {
       for (int x = 0; x < width; x++) {
         Vector memory color = trace(x, y, spp);
 
-        buffer.push(byte(color.x));
-        buffer.push(byte(color.y));
-        buffer.push(byte(color.z));
+        buffer = abi.encodePacked(buffer, bytes1(uint8(uint(color.x))));
+        buffer = abi.encodePacked(buffer, bytes1(uint8(uint(color.y))));
+        buffer = abi.encodePacked(buffer, bytes1(uint8(uint(color.z))));
       }
     }
     return buffer;
   }
   // Benchmark sets up an ephemeral image configuration and traces a select few
   // hand picked pixels to measure EVM execution performance.
-  function Benchmark() constant returns (byte r, byte g, byte b) {
+  function Benchmark() public view returns (bytes1 r, bytes1 g, bytes1 b) {
     // Configure the scene for benchmarking
     width = 1024; height = 768;
 
@@ -111,7 +112,7 @@ contract SnailTracer {
     color = add(color, trace(522, 524, 8)); // Reflective surface mirroring the refractive surface reflecting the light
     color = div(color, 4);
 
-    return (byte(color.x), byte(color.y), byte(color.z));
+    return (bytes1(uint8(uint(color.x))), bytes1(uint8(uint(color.y))), bytes1(uint8(uint(color.z))));
   }
   // trace executes the path tracing for a single pixel of the result image and
   // returns the RGB color vector normalized to [0, 256) value range.
@@ -445,8 +446,8 @@ contract SnailTracer {
       }
     }
     // Intersect the ray with all the triangles
-    for (i=0; i<triangles.length; i++) {
-      d = intersect(triangles[i], ray);
+    for (uint i=0; i<triangles.length; i++) {
+      int d = intersect(triangles[i], ray);
       if (d > 0 && (dist == 0 || d < dist)) {
         dist = d; p = Primitive.Triangle; id = i;
       }
