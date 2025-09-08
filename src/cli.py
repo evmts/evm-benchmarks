@@ -151,50 +151,8 @@ def parse_arguments() -> argparse.Namespace:
 
 def get_default_benchmarks() -> Dict[str, Dict[str, Any]]:
     """Get default benchmark configurations."""
-    benchmarks = {
-        "simple_transfer": {
-            "description": "Simple ETH transfer transaction",
-            "command": "cast send --private-key $PRIVATE_KEY $TO_ADDRESS --value 0.001ether",
-            "category": "transaction",
-            "requires": ["cast", "anvil"]
-        },
-        "erc20_transfer": {
-            "description": "ERC20 token transfer",
-            "command": "cast send $TOKEN_ADDRESS 'transfer(address,uint256)' $TO_ADDRESS 1000000000000000000",
-            "category": "transaction",
-            "requires": ["cast"]
-        },
-        "contract_deploy": {
-            "description": "Deploy a simple contract",
-            "command": "forge create ./contracts/SimpleStorage.sol:SimpleStorage",
-            "category": "deployment",
-            "requires": ["forge"]
-        },
-        "storage_read": {
-            "description": "Read from contract storage",
-            "command": "cast call $CONTRACT_ADDRESS 'getValue()'",
-            "category": "call",
-            "requires": ["cast"]
-        },
-        "storage_write": {
-            "description": "Write to contract storage",
-            "command": "cast send $CONTRACT_ADDRESS 'setValue(uint256)' 42",
-            "category": "transaction",
-            "requires": ["cast"]
-        },
-        "block_sync": {
-            "description": "Sync latest blocks",
-            "command": "reth node --debug.tip 0x1000",
-            "category": "sync",
-            "requires": ["reth"]
-        }
-    }
-    
-    # Add EVM-specific benchmarks
-    evm_benchmarks = get_evm_benchmarks()
-    benchmarks.update(evm_benchmarks)
-    
-    return benchmarks
+    # Only return EVM benchmarks that we can actually run
+    return get_evm_benchmarks()
 
 
 def list_benchmarks(category: Optional[str] = None, verbose: bool = False) -> None:
