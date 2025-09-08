@@ -10,6 +10,7 @@ import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 import shutil
+from evm_benchmarks import get_evm_benchmarks, run_evm_benchmark
 
 
 def check_hyperfine() -> bool:
@@ -150,7 +151,7 @@ def parse_arguments() -> argparse.Namespace:
 
 def get_default_benchmarks() -> Dict[str, Dict[str, Any]]:
     """Get default benchmark configurations."""
-    return {
+    benchmarks = {
         "simple_transfer": {
             "description": "Simple ETH transfer transaction",
             "command": "cast send --private-key $PRIVATE_KEY $TO_ADDRESS --value 0.001ether",
@@ -188,6 +189,12 @@ def get_default_benchmarks() -> Dict[str, Dict[str, Any]]:
             "requires": ["reth"]
         }
     }
+    
+    # Add EVM-specific benchmarks
+    evm_benchmarks = get_evm_benchmarks()
+    benchmarks.update(evm_benchmarks)
+    
+    return benchmarks
 
 
 def list_benchmarks(category: Optional[str] = None, verbose: bool = False) -> None:
@@ -257,7 +264,18 @@ def run_benchmark(
             print(f"   ⚠️  Skipping: Missing required tools: {', '.join(missing_tools)}")
             continue
         
-        # Build hyperfine command
+        # Handle EVM benchmarks differently
+        if config.get('type') == 'evm':
+            try:
+                result = run_evm_benchmark(name, config, iterations, use_hyperfine=True)
+                print(f"   ✅ EVM benchmark completed")
+                if verbose and 'output' in result:
+                    print(result['output'])
+            except Exception as e:
+                print(f"   ❌ EVM benchmark failed: {e}")
+            continue
+        
+        # Build hyperfine command for non-EVM benchmarks
         cmd = ["hyperfine"]
         cmd.extend(["--runs", str(iterations)])
         cmd.extend(["--warmup", str(warmup)])
