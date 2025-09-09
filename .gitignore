@@ -1,7 +1,6 @@
 # Rust
 /target/
 **/*.rs.bk
-Cargo.lock
 
 # Build artifacts
 build/
@@ -15,7 +14,6 @@ cache/
 *.swp
 *.swo
 *~
-.DS_Store
 
 # Environment
 .env
@@ -23,8 +21,9 @@ cache/
 
 # Benchmark results
 results_*.json
-matrix_results.json
+*_results.json
 hyperfine_results.json
+*.bench.json
 
 # Foundry
 cache/
@@ -34,6 +33,7 @@ out/
 evms/*/build/
 evms/*/target/
 evms/*/zig-out/
+evms/*/.zig-cache/
 evms/*/zig-cache/
 
 # Logs
@@ -52,3 +52,6 @@ Thumbs.db
 *.tmp
 temp/
 tmp/
+
+# Test files
+test_*.json
