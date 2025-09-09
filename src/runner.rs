@@ -127,10 +127,8 @@ fn determine_evms(
             available.push("geth".to_string());
         }
         
-        // Check for guillotine
-        if std::path::Path::new("evms/guillotine/apps/cli/guillotine-bench").exists() {
-            available.push("guillotine".to_string());
-        }
+        // Guillotine is always available via the crates.io library
+        available.push("guillotine".to_string());
         
         Ok(available)
     } else if let Some(evms_list) = evms {
