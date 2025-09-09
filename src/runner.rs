@@ -27,6 +27,7 @@ struct HyperfineResult {
 #[derive(Debug, Deserialize)]
 struct HyperfineRun {
     mean: f64,
+    #[serde(default)]
     stddev: f64,
     median: f64,
     min: f64,
