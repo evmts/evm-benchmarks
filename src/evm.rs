@@ -11,6 +11,26 @@ use revm::{
     ExecuteEvm, MainBuilder, MainContext,
 };
 use std::str::FromStr;
+use std::time::Duration;
+
+pub struct EvmResult {
+    pub success: bool,
+    pub gas_used: u64,
+    pub output: Vec<u8>,
+    pub execution_time: Duration,
+    pub logs: Vec<String>,
+}
+
+pub trait EvmExecutor {
+    fn execute(
+        &mut self,
+        bytecode: Vec<u8>,
+        calldata: Vec<u8>,
+        gas_limit: u64,
+    ) -> Result<EvmResult>;
+    
+    fn name(&self) -> &str;
+}
 
 pub fn execute_bytecode(evm_name: &str, bytecode: &str, calldata: &str, gas_limit: u64) -> Result<()> {
     match evm_name {
@@ -102,6 +122,6 @@ fn execute_geth(_bytecode: &str, _calldata: &str, _gas_limit: u64) -> Result<()>
 }
 
 fn execute_guillotine(_bytecode: &str, _calldata: &str, _gas_limit: u64) -> Result<()> {
-    // TODO: Implement guillotine execution via FFI  
-    bail!("Guillotine execution not yet implemented. Use FFI to call guillotine.")
+    // Guillotine execution via CLI binary
+    bail!("Guillotine execution not yet implemented. Use the guillotine-bench binary.")
 }
