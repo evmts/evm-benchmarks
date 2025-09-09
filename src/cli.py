@@ -11,6 +11,11 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any
 import shutil
 from evm_benchmarks import get_evm_benchmarks, run_evm_benchmark
+from cli_display import (
+    Colors, Spinner, ProgressBar, print_header, print_benchmark_header,
+    print_benchmark_info, print_results_summary, print_final_summary,
+    print_error, print_warning, print_success, clear_line
+)
 
 
 def check_hyperfine() -> bool:
@@ -206,11 +211,23 @@ def run_benchmark(
     
     to_run = {benchmark_name: benchmarks[benchmark_name]} if benchmark_name else benchmarks
     
-    print(f"\n🚀 Running {len(to_run)} benchmark(s)...\n")
+    # Print header
+    print_header("EVM BENCHMARK SUITE", f"Running {len(to_run)} benchmark(s)")
     
-    for name, config in to_run.items():
-        print(f"📈 Benchmark: {name}")
-        print(f"   {config['description']}")
+    # Progress tracking
+    all_results = {}
+    progress = ProgressBar(len(to_run))
+    
+    for idx, (name, config) in enumerate(to_run.items(), 1):
+        # Update progress
+        progress.update(idx - 1, f"Preparing {name}...")
+        
+        # Print benchmark header
+        print_benchmark_header(name, config['description'], idx, len(to_run))
+        
+        # Print benchmark info if verbose
+        if verbose:
+            print_benchmark_info(config)
         
         # Check required tools
         missing_tools = []
@@ -219,18 +236,29 @@ def run_benchmark(
                 missing_tools.append(tool)
         
         if missing_tools:
-            print(f"   ⚠️  Skipping: Missing required tools: {', '.join(missing_tools)}")
+            print_warning(f"Skipping: Missing required tools: {', '.join(missing_tools)}")
             continue
         
         # Handle EVM benchmarks differently
         if config.get('type') == 'evm':
+            # Create spinner for running benchmark
+            spinner = Spinner(f"Running {name} ({iterations} iterations)...")
+            spinner.start()
+            
             try:
-                result = run_evm_benchmark(name, config, iterations, use_hyperfine=True)
-                print(f"   ✅ EVM benchmark completed")
-                if verbose and 'output' in result:
-                    print(result['output'])
+                result = run_evm_benchmark(name, config, iterations, use_hyperfine=True, verbose=verbose)
+                spinner.stop(f"Benchmark {name} completed", success=True)
+                
+                # Load and display results
+                results_file = f"results_{name}.json"
+                if Path(results_file).exists():
+                    with open(results_file, 'r') as f:
+                        results_data = json.load(f)
+                        all_results[name] = results_data
+                        print_results_summary(results_data)
+                
             except Exception as e:
-                print(f"   ❌ EVM benchmark failed: {e}")
+                spinner.stop(f"Benchmark {name} failed: {e}", success=False)
             continue
         
         # Build hyperfine command for non-EVM benchmarks
@@ -270,8 +298,15 @@ def run_benchmark(
         
         print()
     
+    # Update final progress
+    progress.update(len(to_run), "All benchmarks completed")
+    
+    # Print final summary
+    if all_results:
+        print_final_summary(all_results)
+    
     if output:
-        print(f"✅ Results saved to: {output}")
+        print_success(f"Results saved to: {output}")
     
     return 0
 
