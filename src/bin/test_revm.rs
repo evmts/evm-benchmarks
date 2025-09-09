@@ -1,14 +1,9 @@
 // Standalone test file to verify revm execution works correctly
 use alloy_primitives::{Address, U256, Bytes};
 use revm::{
-    bytecode::Bytecode,
-    context::{Context, TxEnv},
-    context_interface::result::{ExecutionResult, Output},
-    database::CacheDB,
-    database_interface::EmptyDB,
-    primitives::{TxKind, keccak256},
-    state::AccountInfo,
-    ExecuteEvm, MainContext, MainBuilder,
+    db::{CacheDB, EmptyDB},
+    primitives::{AccountInfo, Bytecode, ExecutionResult, Output, TransactTo, keccak256},
+    EvmBuilder,
 };
 use std::str::FromStr;
 use hex;
@@ -44,7 +39,7 @@ fn main() {
 fn execute_simple_test(bytecode_hex: &str) -> Result<(), String> {
     let bytecode = hex::decode(bytecode_hex).map_err(|e| format!("Hex decode error: {}", e))?;
     
-    let mut db = CacheDB::<EmptyDB>::default();
+    let mut db = CacheDB::new(EmptyDB::default());
     let contract_address = Address::from_str("0x1000000000000000000000000000000000000000")
         .map_err(|e| format!("Address parse error: {}", e))?;
     
@@ -59,40 +54,43 @@ fn execute_simple_test(bytecode_hex: &str) -> Result<(), String> {
         },
     );
     
-    // Create context and EVM
-    let ctx = Context::mainnet().with_db(db);
-    let mut evm = ctx.build_mainnet();
+    // Build EVM
+    let mut evm = EvmBuilder::default()
+        .with_db(db)
+        .build();
     
-    // Execute
-    let tx = TxEnv::builder()
-        .kind(TxKind::Call(contract_address))
-        .caller(Address::from_str("0x0000000000000000000000000000000000000001").unwrap())
-        .data(Bytes::new())
-        .gas_limit(100_000)
-        .build()
-        .map_err(|e| format!("TxEnv build error: {:?}", e))?;
+    // Set up transaction
+    evm.tx_mut().caller = Address::from_str("0x0000000000000000000000000000000000000001").unwrap();
+    evm.tx_mut().transact_to = TransactTo::Call(contract_address);
+    evm.tx_mut().data = Bytes::new();
+    evm.tx_mut().gas_limit = 100_000;
     
-    let result = evm.transact(tx).map_err(|e| format!("Transaction error: {}", e))?;
+    let result = evm.transact_commit();
     
-    match result.result {
-        ExecutionResult::Success { gas_used, output, .. } => {
-            println!("  Gas used: {}", gas_used);
-            if let Output::Call(bytes) = output {
-                println!("  Output: 0x{}", hex::encode(&bytes));
-                // Check if it returned 42
-                if bytes.len() >= 32 {
-                    let value = U256::from_be_slice(&bytes[..32]);
-                    println!("  Returned value: {}", value);
+    match result {
+        Ok(exec_result) => {
+            match exec_result {
+                ExecutionResult::Success { gas_used, output, .. } => {
+                    println!("  Gas used: {}", gas_used);
+                    if let Output::Call(bytes) = output {
+                        println!("  Output: 0x{}", hex::encode(&bytes));
+                        // Check if it returned 42
+                        if bytes.len() >= 32 {
+                            let value = U256::from_be_slice(&bytes[..32]);
+                            println!("  Returned value: {}", value);
+                        }
+                    }
+                    Ok(())
+                }
+                ExecutionResult::Revert { gas_used, output } => {
+                    Err(format!("Reverted - Gas: {}, Data: 0x{}", gas_used, hex::encode(&output)))
+                }
+                ExecutionResult::Halt { reason, gas_used } => {
+                    Err(format!("Halted - Reason: {:?}, Gas: {}", reason, gas_used))
                 }
             }
-            Ok(())
         }
-        ExecutionResult::Revert { gas_used, output } => {
-            Err(format!("Reverted - Gas: {}, Data: 0x{}", gas_used, hex::encode(&output)))
-        }
-        ExecutionResult::Halt { reason, gas_used } => {
-            Err(format!("Halted - Reason: {:?}, Gas: {}", reason, gas_used))
-        }
+        Err(e) => Err(format!("Transaction error: {:?}", e))
     }
 }
 
@@ -104,7 +102,7 @@ fn execute_contract_test(bytecode_hex: &str, calldata_hex: &str) -> Result<(), S
     println!("  Bytecode length: {} bytes", bytecode.len());
     println!("  Calldata: 0x{}", calldata_hex);
     
-    let mut db = CacheDB::<EmptyDB>::default();
+    let mut db = CacheDB::new(EmptyDB::default());
     let contract_address = Address::from_str("0x1000000000000000000000000000000000000000")
         .map_err(|e| format!("Address parse error: {}", e))?;
     
@@ -131,37 +129,40 @@ fn execute_contract_test(bytecode_hex: &str, calldata_hex: &str) -> Result<(), S
         },
     );
     
-    // Create context and EVM
-    let ctx = Context::mainnet().with_db(db);
-    let mut evm = ctx.build_mainnet();
+    // Build EVM
+    let mut evm = EvmBuilder::default()
+        .with_db(db)
+        .build();
     
-    // Execute with high gas limit
-    let tx = TxEnv::builder()
-        .kind(TxKind::Call(contract_address))
-        .caller(caller)
-        .data(Bytes::from(calldata))
-        .gas_limit(30_000_000)
-        .gas_price(1_000_000_000u128)
-        .build()
-        .map_err(|e| format!("TxEnv build error: {:?}", e))?;
+    // Set up transaction with high gas limit
+    evm.tx_mut().caller = caller;
+    evm.tx_mut().transact_to = TransactTo::Call(contract_address);
+    evm.tx_mut().data = Bytes::from(calldata);
+    evm.tx_mut().gas_limit = 30_000_000;
+    evm.tx_mut().gas_price = U256::from(1_000_000_000u128);
     
-    let result = evm.transact(tx).map_err(|e| format!("Transaction error: {}", e))?;
+    let result = evm.transact_commit();
     
-    match result.result {
-        ExecutionResult::Success { gas_used, output, .. } => {
-            println!("  Gas used: {}", gas_used);
-            if let Output::Call(bytes) = output {
-                if !bytes.is_empty() {
-                    println!("  Output: 0x{}", hex::encode(&bytes));
+    match result {
+        Ok(exec_result) => {
+            match exec_result {
+                ExecutionResult::Success { gas_used, output, .. } => {
+                    println!("  Gas used: {}", gas_used);
+                    if let Output::Call(bytes) = output {
+                        if !bytes.is_empty() {
+                            println!("  Output: 0x{}", hex::encode(&bytes));
+                        }
+                    }
+                    Ok(())
+                }
+                ExecutionResult::Revert { gas_used, output } => {
+                    Err(format!("Reverted - Gas: {}, Data: 0x{}", gas_used, hex::encode(&output)))
+                }
+                ExecutionResult::Halt { reason, gas_used } => {
+                    Err(format!("Halted - Reason: {:?}, Gas: {}", reason, gas_used))
                 }
             }
-            Ok(())
         }
-        ExecutionResult::Revert { gas_used, output } => {
-            Err(format!("Reverted - Gas: {}, Data: 0x{}", gas_used, hex::encode(&output)))
-        }
-        ExecutionResult::Halt { reason, gas_used } => {
-            Err(format!("Halted - Reason: {:?}, Gas: {}", reason, gas_used))
-        }
+        Err(e) => Err(format!("Transaction error: {:?}", e))
     }
 }
