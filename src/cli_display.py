@@ -154,6 +154,8 @@ def print_benchmark_info(info: Dict[str, Any]):
 
 def format_time(seconds: float) -> str:
     """Format time in appropriate units."""
+    if seconds is None:
+        return "N/A"
     if seconds < 0.001:
         return f"{seconds * 1_000_000:.2f} μs"
     elif seconds < 1:
@@ -190,7 +192,7 @@ def print_results_summary(results: Dict[str, Any]):
 
 def print_performance_bar(times: list, min_time: float, max_time: float):
     """Print a visual performance distribution bar."""
-    if not times or min_time >= max_time:
+    if not times or min_time is None or max_time is None or min_time >= max_time:
         return
     
     width = 50
@@ -267,3 +269,57 @@ def clear_line():
     """Clear the current line."""
     sys.stdout.write('\r' + ' ' * 80 + '\r')
     sys.stdout.flush()
+
+
+def print_matrix_summary(matrix_results: dict, benchmark_names: list):
+    """Print a comparison matrix of benchmark results across EVMs."""
+    print(f"\n{Colors.GREEN}{'='*80}{Colors.RESET}")
+    print(f"                           {Colors.BOLD}BENCHMARK MATRIX SUMMARY{Colors.RESET}")
+    print(f"{Colors.GREEN}{'='*80}{Colors.RESET}\n")
+    
+    # Prepare data for table
+    evms = list(matrix_results.keys())
+    
+    # Print header
+    header = f"  {'Benchmark':<30} "
+    for evm in evms:
+        header += f"{evm.upper():<20} "
+    print(f"{Colors.BOLD}{header}{Colors.RESET}")
+    print(f"  {Colors.DIM}{'-'*78}{Colors.RESET}")
+    
+    # Print each benchmark row
+    for benchmark in benchmark_names:
+        row = f"  {benchmark:<30} "
+        
+        for evm in evms:
+            if benchmark in matrix_results[evm]:
+                result = matrix_results[evm][benchmark]
+                if "error" in result:
+                    row += f"{Colors.RED}{'FAILED':<20}{Colors.RESET} "
+                elif "results" in result and result["results"]:
+                    # Check if results is a dict with 'results' key (hyperfine format)
+                    if isinstance(result["results"], dict) and "results" in result["results"]:
+                        mean_time = result["results"]["results"][0].get("mean", 0)
+                    elif isinstance(result["results"], list) and len(result["results"]) > 0:
+                        mean_time = result["results"][0].get("mean", 0)
+                    else:
+                        mean_time = 0
+                    
+                    if mean_time > 0:
+                        if mean_time < 0.001:
+                            time_str = f"{mean_time*1000000:.2f} μs"
+                        elif mean_time < 1:
+                            time_str = f"{mean_time*1000:.2f} ms"
+                        else:
+                            time_str = f"{mean_time:.2f} s"
+                        row += f"{Colors.GREEN}{time_str:<20}{Colors.RESET} "
+                    else:
+                        row += f"{Colors.YELLOW}{'NO TIME':<20}{Colors.RESET} "
+                else:
+                    row += f"{Colors.YELLOW}{'NO DATA':<20}{Colors.RESET} "
+            else:
+                row += f"{Colors.DIM}{'SKIPPED':<20}{Colors.RESET} "
+        
+        print(row)
+    
+    print(f"\n{Colors.GREEN}{'='*80}{Colors.RESET}")
