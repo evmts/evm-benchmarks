@@ -1,78 +1,54 @@
-# Byte-compiled / optimized / DLL files
-__pycache__/
-*.py[cod]
-*$py.class
+# Rust
+/target/
+**/*.rs.bk
+Cargo.lock
 
-# C extensions
-*.so
-
-# Distribution / packaging
-.Python
+# Build artifacts
 build/
-develop-eggs/
 dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
+out/
+cache/
 
-# PyInstaller
-*.manifest
-*.spec
-
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
-
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-.hypothesis/
-.pytest_cache/
-
-# Virtual environments
-venv/
-
-# Go binaries
-/bench
-/bench-go
-*.exe
-ENV/
-env/
-.venv/
-
-# IDEs
-.vscode/
+# IDE
 .idea/
+.vscode/
 *.swp
 *.swo
 *~
 .DS_Store
 
-# mypy
-.mypy_cache/
-.dmypy.json
-dmypy.json
+# Environment
+.env
+.env.local
 
-# Pyre type checker
-.pyre/
+# Benchmark results
+results_*.json
+matrix_results.json
+hyperfine_results.json
 
 # Foundry
 cache/
 out/
+
+# EVM submodules build artifacts
+evms/*/build/
+evms/*/target/
+evms/*/zig-out/
+evms/*/zig-cache/
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor backups
+*~
+*.bak
+*.backup
+
+# Temporary files
+*.tmp
+temp/
+tmp/

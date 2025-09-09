@@ -1,59 +1,53 @@
-# Multi-stage build for EVM benchmark runner
-FROM golang:1.21-alpine AS go-builder
+# EVM benchmark runner Docker image
+FROM rust:1.75-slim AS builder
 
 # Install build dependencies
-RUN apk add --no-cache git make gcc musl-dev linux-headers
+RUN apt-get update && apt-get install -y \
+    pkg-config \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-# Build go-ethereum
-WORKDIR /build
-COPY evms/go-ethereum ./go-ethereum
-RUN cd go-ethereum && make geth
+# Set up working directory
+WORKDIR /app
 
-# Build benchmark runner
-COPY evms/benchmark-runner ./benchmark-runner
-RUN cd benchmark-runner && go mod download && make build
+# Copy Cargo files
+COPY Cargo.toml Cargo.lock ./
 
-# Python stage
-FROM python:3.11-slim
+# Copy source code
+COPY src ./src
+
+# Build release binary
+RUN cargo build --release
+
+# Runtime stage
+FROM debian:bookworm-slim
 
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y \
     curl \
     git \
     make \
+    ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Foundry
 RUN curl -L https://foundry.paradigm.xyz | bash && \
     /root/.foundry/bin/foundryup
 
-# Copy go-ethereum binaries
-COPY --from=go-builder /build/go-ethereum/build/bin/geth /usr/local/bin/
-COPY --from=go-builder /build/go-ethereum/build/bin/evm /usr/local/bin/
-COPY --from=go-builder /build/benchmark-runner/benchmark-runner-simple /usr/local/bin/
-
-# Set up Python environment
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy application code
-COPY . .
-
 # Install hyperfine for benchmarking
 RUN curl -L https://github.com/sharkdp/hyperfine/releases/download/v1.18.0/hyperfine_1.18.0_amd64.deb -o hyperfine.deb && \
     dpkg -i hyperfine.deb && \
     rm hyperfine.deb
 
-# Install the package
-RUN pip install -e .
+# Copy binary from builder
+COPY --from=builder /app/target/release/bench /usr/local/bin/bench
 
-# Build Foundry contracts
-RUN /root/.foundry/bin/forge build
+# Copy application code
+WORKDIR /app
+COPY . .
 
-# Set environment variables
+# Set PATH to include foundry binaries
 ENV PATH="/root/.foundry/bin:${PATH}"
-ENV PYTHONUNBUFFERED=1
 
 # Default command
-CMD ["evm-bench", "--help"]
+CMD ["bench", "--help"]

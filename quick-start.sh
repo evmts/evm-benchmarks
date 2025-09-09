@@ -46,14 +46,6 @@ check_dependencies() {
     
     local missing_deps=()
     
-    # Check Go
-    if command_exists go; then
-        GO_VERSION=$(go version | awk '{print $3}')
-        print_success "Go installed: $GO_VERSION"
-    else
-        print_error "Go is not installed"
-        missing_deps+=("go")
-    fi
     
     # Check Hyperfine
     if command_exists hyperfine; then
@@ -106,9 +98,6 @@ check_dependencies() {
         
         for dep in "${missing_deps[@]}"; do
             case $dep in
-                go)
-                    echo "  Go: https://golang.org/doc/install"
-                    ;;
                 hyperfine)
                     echo "  Hyperfine:"
                     echo "    macOS: brew install hyperfine"
@@ -154,32 +143,16 @@ init_submodules() {
     fi
 }
 
-# Install Go dependencies
-install_go_deps() {
-    print_header "Installing Go Dependencies"
-    
-    print_status "Downloading Go modules..."
-    go mod download
-    
-    print_status "Tidying Go modules..."
-    go mod tidy
-    
-    print_success "Go dependencies installed"
-}
 
-# Build the CLI
-build_cli() {
-    print_header "Building Benchmark CLI"
+# Build Rust CLI
+build_rust_cli() {
+    print_header "Building Rust CLI"
     
-    print_status "Building bench CLI..."
-    if [ -f "Makefile" ]; then
-        make build-go
-    else
-        go build -o bench cmd/bench/main.go
-    fi
+    print_status "Building release binary..."
+    cargo build --release
     
-    if [ -f "./bench" ]; then
-        print_success "CLI built successfully: ./bench"
+    if [ -f "./target/release/bench" ]; then
+        print_success "CLI built successfully: ./target/release/bench"
     else
         print_error "Failed to build CLI"
         exit 1
@@ -273,11 +246,6 @@ build_evms() {
 run_benchmarks() {
     print_header "Running Benchmarks"
     
-    if [ ! -f "./bench" ]; then
-        print_error "Benchmark CLI not found. Please build first."
-        exit 1
-    fi
-    
     # Check which EVMs are available
     local available_evms=()
     
@@ -313,17 +281,17 @@ run_benchmarks() {
         # Run with all available EVMs
         if [ ${#available_evms[@]} -gt 1 ]; then
             print_status "Running matrix benchmark with all available EVMs..."
-            ./bench run --all --no-tui --iterations 5 --warmup 2
+            ./target/release/bench run --all --iterations 5 --warmup 2
         else
             print_status "Running benchmark with ${available_evms[0]}..."
-            ./bench run --evm "${available_evms[0]}" --no-tui --iterations 5 --warmup 2
+            ./target/release/bench run --evm "${available_evms[0]}" --iterations 5 --warmup 2
         fi
     else
-        print_warning "Hyperfine not installed, running without statistical analysis..."
+        print_warning "Hyperfine not installed, running with limited statistical analysis..."
         if [ ${#available_evms[@]} -gt 1 ]; then
-            ./bench run --all --no-tui --no-hyperfine
+            ./target/release/bench run --all
         else
-            ./bench run --evm "${available_evms[0]}" --no-tui --no-hyperfine
+            ./target/release/bench run --evm "${available_evms[0]}"
         fi
     fi
 }
@@ -335,11 +303,10 @@ main() {
     echo "This script will:"
     echo "  1. Check and install dependencies"
     echo "  2. Initialize git submodules"
-    echo "  3. Install Go dependencies"
-    echo "  4. Build the benchmark CLI"
-    echo "  5. Build Solidity contracts"
-    echo "  6. Build EVM implementations"
-    echo "  7. Run all benchmarks with all available EVMs"
+    echo "  3. Build Rust CLI"
+    echo "  4. Build Solidity contracts"
+    echo "  5. Build EVM implementations"
+    echo "  6. Run all benchmarks with all available EVMs"
     echo
     
     read -p "Continue? (y/n) " -n 1 -r
@@ -351,18 +318,17 @@ main() {
     # Run all setup steps
     check_dependencies
     init_submodules
-    install_go_deps
-    build_cli
+    build_rust_cli
     build_contracts
     build_evms
     
     print_header "Setup Complete!"
     
     echo "You can now run benchmarks with:"
-    echo "  ./bench run                    # Interactive TUI"
-    echo "  ./bench run --no-tui           # Command line mode"
-    echo "  ./bench run --all --no-tui     # All EVMs, no TUI"
-    echo "  ./bench run --evm geth         # Specific EVM"
+    echo "  ./target/release/bench run                    # Run all benchmarks"
+    echo "  ./target/release/bench run --all              # All EVMs"
+    echo "  ./target/release/bench run --evm geth         # Specific EVM"
+    echo "  ./target/release/bench list                   # List available benchmarks"
     echo
     
     read -p "Run benchmarks now? (y/n) " -n 1 -r
