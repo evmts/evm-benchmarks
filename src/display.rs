@@ -57,24 +57,27 @@ pub fn show_results(results: &HashMap<String, HashMap<String, BenchmarkResult>>)
             let mut evms: Vec<_> = evm_results.iter().collect();
             evms.sort_by(|a, b| a.1.mean.partial_cmp(&b.1.mean).unwrap());
             
-            let baseline = evms[0].1.mean;
-            for (evm, result) in evms {
-                let relative = result.mean / baseline;
-                let bar_length = (20.0 / relative) as usize;
-                let bar = "█".repeat(bar_length);
+            let fastest = evms[0];
+            let fastest_time = fastest.1.mean;
+            
+            for (evm, result) in &evms {
+                let bar_length = ((fastest_time / result.mean) * 20.0) as usize;
+                let bar = "█".repeat(bar_length.min(20));
                 
-                if relative == 1.0 {
-                    println!("      {} {}{} {:.2}x (baseline)",
+                if evm == &fastest.0 {
+                    println!("      {} {}{} {:.2}x (fastest)",
                         format!("{:12}", evm).bright_green(),
                         bar.bright_green(),
                         " ".repeat(20 - bar_length),
-                        relative);
+                        1.00);
                 } else {
-                    println!("      {} {}{} {:.2}x slower",
+                    let times_slower = result.mean / fastest_time;
+                    println!("      {} {}{} {:.2}x slower than {}",
                         format!("{:12}", evm),
                         bar.bright_yellow(),
-                        " ".repeat(20 - bar_length),
-                        relative);
+                        " ".repeat(20 - bar_length.min(20)),
+                        times_slower,
+                        fastest.0);
                 }
             }
         }
