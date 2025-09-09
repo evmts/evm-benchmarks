@@ -1,10 +1,10 @@
 # EVM Benchmark Repository
 
 ## Project Overview
-This repository contains benchmarking tools for comparing Ethereum Virtual Machine (EVM) implementations. The primary goal is to provide accurate, reproducible performance measurements across different EVM implementations including **geth**, **guillotine**, and **revm**.
+This repository contains benchmarking tools for comparing Ethereum Virtual Machine (EVM) implementations. The primary goal is to provide accurate, reproducible performance measurements across different EVM implementations including **guillotine** and **revm**.
 
 ## Implementation Language
-This project is being migrated to **Rust** using the Clap framework for robust CLI functionality and superior performance.
+This project is implemented in **Rust** using the Clap framework for robust CLI functionality and superior performance.
 
 ## Critical Benchmark Integrity Rules
 
@@ -26,7 +26,13 @@ Benchmarks are only valuable if they measure real performance. Any compromise in
 ```
 bench/
 ├── src/                      # Rust source code
-│   └── main.rs              # Main CLI application
+│   ├── main.rs              # Main CLI application
+│   ├── cli.rs               # Clap CLI definitions
+│   ├── benchmarks.rs        # Benchmark configurations
+│   ├── compiler.rs          # Solidity compilation
+│   ├── evm.rs               # EVM execution logic
+│   ├── evms/                # EVM implementations
+│   └── runner.rs            # Benchmark runner
 ├── Cargo.toml               # Rust package manifest
 ├── benchmarks/
 │   ├── solidity/            # Solidity benchmark contracts
@@ -38,33 +44,23 @@ bench/
 │       ├── snailtracer.sol  # Solidity 0.4.26 implementation
 │       └── snailtracer_runtime.hex  # Compiled bytecode
 ├── evms/
-│   ├── go-ethereum/         # Geth EVM implementation (git submodule)
 │   ├── guillotine-go-sdk/   # Guillotine EVM implementation (git submodule)
 │   └── revm/                # Revm implementation (git submodule)
-├── out/                     # Foundry build artifacts
-├── Makefile                 # Build automation
 └── results_*.json           # Benchmark results for each test
 ```
 
 ## Supported EVM Implementations
 
-### 1. Geth (go-ethereum)
-- **Binary**: `evms/go-ethereum/build/bin/evm` or system `evm`
-- **Integration**: Uses the standalone `evm` tool for benchmark execution
-- **Command**: `evm run --codefile <file> --gas <limit> --input <calldata>`
-
-### 2. Guillotine
+### 1. Guillotine
 - **Binary**: `evms/guillotine-go-sdk/apps/cli/guillotine-bench`
 - **Integration**: Custom Go CLI with Zig EVM core via FFI
 - **Command**: `guillotine-bench run --codefile <file> --gas <limit> --input <calldata>`
 - **Architecture**: Zig-based EVM with Go bindings, optimized for performance
 
-### 3. Revm
-- **Binary**: `evms/revm/target/release/revme` (built from source)
-- **Integration**: Rust-based EVM using revme CLI tool
-- **Command**: `revme evm --path <file> --gas-limit <limit> --input <calldata>`
+### 2. Revm
+- **Integration**: Native Rust integration via revm crate
 - **Architecture**: High-performance Rust implementation, widely used in production
-- **Build**: `cd evms/revm && cargo build --release -p revme`
+- **Note**: Built-in support, no external binary required
 
 ## Available Benchmarks
 
@@ -79,54 +75,53 @@ bench/
 
 ## Running Benchmarks
 
-### Basic Usage (Rust CLI)
+### Basic Usage
 ```bash
 # Build the Rust CLI
 cargo build --release
 
 # Run all benchmarks
-./target/release/bench run
+cargo run --release -- run
 
 # Run specific benchmark
-./target/release/bench run ten_thousand_hashes
+cargo run --release -- run ten_thousand_hashes
 
-# Run with custom iterations
-./target/release/bench run --iterations 20 --warmup 5
-
-# Run on specific EVM
-./target/release/bench run --evm guillotine
-
-# Run matrix benchmark across multiple EVMs
-./target/release/bench run --evms geth,guillotine
-./target/release/bench run --all  # Run on all available EVMs
+# List available benchmarks
+cargo run --release -- list
 ```
 
 ### Advanced Options
 ```bash
+# Run on specific EVM
+cargo run --release -- run --evm guillotine
+cargo run --release -- run --evm revm
+
+# Run on multiple EVMs (matrix mode)
+cargo run --release -- run --evms guillotine,revm
+cargo run --release -- run --all
+
 # Customize iterations and warmup
-./target/release/bench run --iterations 20 --warmup 5
+cargo run --release -- run --iterations 20 --warmup 5
 
 # Export results
-./target/release/bench run --output results.json --export-json hyperfine.json
+cargo run --release -- run --output results.json
+cargo run --release -- run --export-json hyperfine.json
 
 # Verbose output
-./target/release/bench run -v
+cargo run --release -- run -v
 ```
 
 ### Matrix Benchmarking
 The CLI supports running benchmarks across multiple EVM implementations simultaneously:
 ```bash
-# Compare geth and guillotine
-./target/release/bench run --evms geth,guillotine
+# Compare implementations
+cargo run --release -- compare guillotine revm
 
 # Run all benchmarks on all EVMs
-./target/release/bench run --all
-
-# Compare implementations
-./target/release/bench compare geth guillotine revm
+cargo run --release -- run --all
 
 # Save matrix results
-./target/release/bench run --all --output full_matrix.json
+cargo run --release -- run --all --output full_matrix.json
 ```
 
 Matrix results include:
@@ -151,29 +146,22 @@ All benchmarks use [hyperfine](https://github.com/sharkdp/hyperfine) for accurat
 - JSON export for detailed analysis
 - Automatic outlier detection
 
-### 3. Dynamic Benchmark Discovery
-- Automatically detects compiled Solidity contracts
-- Loads bytecode from Foundry artifacts (`out/` directory)
-- Validates EVM binary availability
-- Skips unavailable benchmarks gracefully
+### 3. Integrated Solidity Compilation
+- Uses foundry-compilers crate for on-demand compilation
+- No external Foundry installation required
+- Transparent compilation before benchmark execution
+- Automatic contract detection and loading
 
 ### 4. Unified Benchmark Interface
 All EVM implementations use the same benchmark execution flow:
-1. Create temporary bytecode file
+1. Compile contracts if needed
 2. Execute with specified gas limit and calldata
 3. Measure execution time via hyperfine
 4. Parse and display results
 
 ## Building EVM Implementations
 
-### Building Geth
-```bash
-cd evms/go-ethereum
-make geth
-make evm  # Required for benchmarking
-```
-
-### Building Guillotine
+### Building Guillotine (Optional)
 ```bash
 cd evms/guillotine-go-sdk
 zig build
@@ -183,38 +171,31 @@ cd apps/cli
 go build -o guillotine-bench .
 ```
 
-### Building Revm
-```bash
-cd evms/revm
-cargo build --release -p revme
-# Binary will be at: evms/revm/target/release/revme
-```
+### Revm
+Revm is integrated directly via Cargo dependencies - no separate build required.
 
 ## Development Guidelines
 
 ### Adding New Benchmarks
 1. Create Solidity contract in `benchmarks/solidity/`
-2. Compile with Foundry: `forge build`
-3. Add configuration in the Rust implementation to include the new benchmark
+2. Add configuration in `src/benchmarks.rs`
+3. Test with `cargo run --release -- run <benchmark_name>`
 
 ### Adding New EVM Implementation
-1. Add binary finder logic in Rust implementation
-2. Add runner function for the new EVM
-3. Update benchmark runner to route to new implementation
+1. Add implementation in `src/evms/` module
+2. Update runner logic in `src/runner.rs`
+3. Add to CLI options in `src/cli.rs`
 
 ### Testing
 ```bash
 # Run Rust tests
 cargo test
 
-# Run Solidity tests
-forge test
-
 # Run a quick benchmark test
-./target/release/bench run ten_thousand_hashes --iterations 3
+cargo run --release -- run ten_thousand_hashes --iterations 3
 
 # Test with verbose output
-./target/release/bench run -v
+cargo run --release -- run -v
 ```
 
 ## Performance Considerations
@@ -239,19 +220,18 @@ For Guillotine benchmarks, suppress debug output:
 Results are stored as JSON with hyperfine statistics:
 ```json
 {
-  "results": [
-    {
-      "command": "evm run ...",
-      "mean": 0.123,
-      "stddev": 0.005,
-      "median": 0.122,
-      "user": 0.120,
-      "system": 0.003,
-      "min": 0.118,
-      "max": 0.130,
-      "times": [0.118, 0.122, ...]
-    }
-  ]
+  "benchmark": "ten_thousand_hashes",
+  "evm": "revm",
+  "results": {
+    "mean": 0.123,
+    "stddev": 0.005,
+    "median": 0.122,
+    "user": 0.120,
+    "system": 0.003,
+    "min": 0.118,
+    "max": 0.130,
+    "times": [0.118, 0.122, ...]
+  }
 }
 ```
 
@@ -259,28 +239,20 @@ Results are stored as JSON with hyperfine statistics:
 
 ### Common Issues
 
-1. **"geth not found"**
-   - Build geth: `cd evms/go-ethereum && make geth && make evm`
-   - Or install system-wide: `brew install ethereum` (macOS)
-
-2. **"guillotine-bench not found"**
+1. **"guillotine-bench not found"**
    - Build Guillotine: `cd evms/guillotine-go-sdk && zig build`
    - Build CLI: `cd apps/cli && go build -o guillotine-bench .`
 
-3. **"hyperfine not installed"**
+2. **"hyperfine not installed"**
    - macOS: `brew install hyperfine`
    - Linux: `apt install hyperfine`
    - Cargo: `cargo install hyperfine`
 
-4. **Benchmark fails with "out of gas"**
+3. **Benchmark fails with "out of gas"**
    - Increase gas limit in benchmark configuration
    - Check if bytecode includes constructor vs runtime code
 
-5. **No benchmarks available**
-   - Run `forge build` to compile Solidity contracts
-   - Check `out/` directory for compiled artifacts
-
-6. **Rust CLI issues**
+4. **Rust CLI issues**
    - Build with: `cargo build --release`
    - Check Rust version: requires Rust 1.70+
    - Verify hyperfine is installed
