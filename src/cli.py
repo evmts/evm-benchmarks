@@ -102,7 +102,7 @@ def parse_arguments() -> argparse.Namespace:
     run_parser.add_argument(
         "--evm",
         type=str,
-        choices=["geth", "guillotine"],
+        choices=["geth", "guillotine", "revm"],
         help="Single EVM implementation to use"
     )
     run_parser.add_argument(
@@ -490,12 +490,12 @@ def main() -> int:
             
             if args.all:
                 # Run all available EVMs
-                evms_to_run = ["geth", "guillotine"]
+                evms_to_run = ["geth", "guillotine", "revm"]
             elif args.evms:
                 # Parse comma-separated list
                 evms_to_run = [evm.strip() for evm in args.evms.split(",")]
                 # Validate EVMs
-                valid_evms = ["geth", "guillotine"]
+                valid_evms = ["geth", "guillotine", "revm"]
                 for evm in evms_to_run:
                     if evm not in valid_evms:
                         print(f"Error: Unknown EVM '{evm}'. Valid options: {', '.join(valid_evms)}", file=sys.stderr)
