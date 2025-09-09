@@ -156,6 +156,147 @@ def find_guillotine_binary() -> Optional[str]:
     return None
 
 
+def find_revm_binary() -> Optional[str]:
+    """Find the revm (revme) binary."""
+    # Check for the revme binary in the release build - note the path structure
+    revme_release = Path("revm/target/release/revme")
+    if revme_release.exists():
+        return str(revme_release.absolute())
+    
+    # Check in evms directory as well
+    evms_revme_release = Path("evms/revm/target/release/revme")
+    if evms_revme_release.exists():
+        return str(evms_revme_release.absolute())
+    
+    # Check for debug build
+    revme_debug = Path("revm/target/debug/revme")
+    if revme_debug.exists():
+        return str(revme_debug.absolute())
+    
+    evms_revme_debug = Path("evms/revm/target/debug/revme")
+    if evms_revme_debug.exists():
+        return str(evms_revme_debug.absolute())
+    
+    # Check for system revme
+    result = subprocess.run(["which", "revme"], capture_output=True, text=True)
+    if result.returncode == 0:
+        return result.stdout.strip()
+    
+    return None
+
+
+def run_revm_benchmark(
+    name: str,
+    config: Dict[str, Any],
+    iterations: int = 10,
+    use_hyperfine: bool = True,
+    verbose: bool = False
+) -> Dict[str, Any]:
+    """Run an EVM benchmark using revm (revme)."""
+    
+    revm_binary = find_revm_binary()
+    if not revm_binary:
+        raise RuntimeError("revme not found. Please ensure revm is built (cargo build --release -p revme in evms/revm).")
+    
+    # Prepare the bytecode and calldata
+    bytecode = config["bytecode"]
+    calldata = config.get("calldata", "")
+    
+    if use_hyperfine:
+        # Create a temporary file for the bytecode
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.hex', delete=False) as f:
+            f.write(bytecode)
+            temp_file = f.name
+        
+        try:
+            # Build the command for revme evm
+            cmd_args = [
+                revm_binary,
+                "evm",
+                "--path", temp_file,
+                "--gas-limit", str(config.get("gas", 30000000))
+            ]
+            
+            if calldata:
+                cmd_args.extend(["--input", calldata])
+            
+            # Use hyperfine for benchmarking
+            cmd = [
+                "hyperfine",
+                "--runs", str(iterations),
+                "--warmup", "3",
+                "--export-json", f"results_{name}.json",
+                "--",
+                " ".join(cmd_args)
+            ]
+            
+            if verbose:
+                print(f"Running revm benchmark '{name}' with hyperfine...")
+                print(f"Command: {' '.join(cmd)}")
+            
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            
+            if result.returncode == 0:
+                # Parse hyperfine results
+                results_file = f"results_{name}.json"
+                if Path(results_file).exists():
+                    with open(results_file, 'r') as f:
+                        hyperfine_results = json.load(f)
+                        return {
+                            "name": name,
+                            "tool": "hyperfine",
+                            "evm": "revm",
+                            "results": hyperfine_results
+                        }
+                else:
+                    return {
+                        "name": name,
+                        "tool": "hyperfine",
+                        "evm": "revm",
+                        "output": result.stdout
+                    }
+            else:
+                raise RuntimeError(f"Hyperfine failed: {result.stderr}")
+        finally:
+            # Clean up temp file
+            if Path(temp_file).exists():
+                os.unlink(temp_file)
+    else:
+        # Direct execution without hyperfine
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.hex', delete=False) as f:
+            f.write(bytecode)
+            temp_file = f.name
+        
+        try:
+            cmd = [
+                revm_binary,
+                "evm",
+                "--path", temp_file,
+                "--gas-limit", str(config.get("gas", 30000000))
+            ]
+            
+            if calldata:
+                cmd.extend(["--input", calldata])
+        
+            print(f"Running revm benchmark '{name}' directly...")
+            
+            for i in range(iterations):
+                result = subprocess.run(cmd, capture_output=True, text=True)
+                if result.returncode != 0:
+                    raise RuntimeError(f"revm execution failed: {result.stderr}")
+            
+            return {
+                "name": name,
+                "tool": "revm",
+                "evm": "revm",
+                "output": f"Completed {iterations} iterations"
+            }
+        finally:
+            # Clean up temp file
+            if Path(temp_file).exists():
+                os.unlink(temp_file)
+
+
 def run_guillotine_benchmark(
     name: str,
     config: Dict[str, Any],
@@ -290,6 +431,8 @@ def run_evm_benchmark(
     
     if evm_type == "guillotine":
         return run_guillotine_benchmark(name, config, iterations, use_hyperfine, verbose)
+    elif evm_type == "revm":
+        return run_revm_benchmark(name, config, iterations, use_hyperfine, verbose)
     
     # Default to geth implementation
     
