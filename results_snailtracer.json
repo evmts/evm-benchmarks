@@ -1,18 +1,36 @@
 {
   "results": [
     {
-      "command": "/Users/williamcory/bench/evms/Guillotine/apps/cli/guillotine-bench run --codefile /var/folders/4s/d0wlfs9d00v4349cdqgd13f00000gn/T/tmpre6sos2o.hex --gas 1000000000 --input 30627b7c",
-      "mean": 0.03373421066,
-      "stddev": null,
-      "median": 0.03373421066,
-      "user": 0.02875908,
-      "system": 0.00410782,
-      "min": 0.03373421066,
-      "max": 0.03373421066,
+      "command": "/Users/williamcory/bench/evms/revm/target/release/revme evm --path /var/folders/4s/d0wlfs9d00v4349cdqgd13f00000gn/T/tmpjo8_hnie.hex --gas-limit 1000000000 --input 30627b7c",
+      "mean": 0.03657441224000001,
+      "stddev": 0.002768095522646671,
+      "median": 0.03557523314,
+      "user": 0.032393979999999996,
+      "system": 0.0028555600000000005,
+      "min": 0.03447002514,
+      "max": 0.043527400140000005,
       "times": [
-        0.03373421066
+        0.036180733140000004,
+        0.035597483140000004,
+        0.035187441140000005,
+        0.03489260814,
+        0.03555298314,
+        0.035150358140000004,
+        0.043527400140000005,
+        0.03920231614,
+        0.03598277414,
+        0.03447002514
       ],
       "exit_codes": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
         0
       ]
     }

@@ -1,18 +1,36 @@
 {
   "results": [
     {
-      "command": "/Users/williamcory/bench/evms/Guillotine/apps/cli/guillotine-bench run --codefile /var/folders/4s/d0wlfs9d00v4349cdqgd13f00000gn/T/tmp2y49swdk.hex --gas 30000000 --input 30627b7c",
-      "mean": 0.011553246960000001,
-      "stddev": null,
-      "median": 0.011553246960000001,
-      "user": 0.009030139999999999,
-      "system": 0.0021356599999999997,
-      "min": 0.011553246960000001,
-      "max": 0.011553246960000001,
+      "command": "/Users/williamcory/bench/evms/revm/target/release/revme evm --path /var/folders/4s/d0wlfs9d00v4349cdqgd13f00000gn/T/tmpe16z2xta.hex --gas-limit 30000000 --input 30627b7c",
+      "mean": 0.037391914160000005,
+      "stddev": 0.0005497604714557855,
+      "median": 0.037379093360000004,
+      "user": 0.019650319999999995,
+      "system": 0.01683972,
+      "min": 0.036394384360000004,
+      "max": 0.03843067636,
       "times": [
-        0.011553246960000001
+        0.03700421836,
+        0.03843067636,
+        0.037306218360000004,
+        0.03719317736,
+        0.036394384360000004,
+        0.03707759336,
+        0.03758971836,
+        0.03754701036,
+        0.037451968360000004,
+        0.03792417636
       ],
       "exit_codes": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
         0
       ]
     }
