@@ -48,7 +48,7 @@ pub fn get_evm_benchmarks(compiled_contracts: &HashMap<String, CompiledContract>
             category: "compute".to_string(),
             bench_type: "evm".to_string(),
             bytecode: contract.bytecode.clone(),
-            calldata: "0x".to_string(),
+            calldata: "0x30627b7c".to_string(), // Benchmark() function selector
             gas: 1000000000, // 1B gas
         });
     }

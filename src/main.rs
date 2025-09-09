@@ -3,6 +3,7 @@ mod benchmarks;
 mod compiler;
 mod display;
 mod evm;
+mod evms;
 mod runner;
 
 use anyhow::Result;
