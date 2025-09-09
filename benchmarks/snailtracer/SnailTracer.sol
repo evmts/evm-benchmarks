@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 // This contract is a slightly modified version of Péter Szilágyi's snailtracer.sol, licensed under GPL-3.0
 // https://github.com/karalabe/snailtracer
-pragma solidity ^0.8.0;
+pragma solidity ^0.4.26;
 
 contract SnailTracer {
   // Image properties for the path tracer
@@ -19,14 +19,14 @@ contract SnailTracer {
   // TracePixel traces a single pixel of the configured image and returns the RGB
   // values to the caller. This method is meant to be used specifically for high
   // SPP renderings which would have a huge overhead otherwise.
-  function TracePixel(int x, int y, int spp) public view returns (bytes1 r, bytes1 g, bytes1 b) {
+  function TracePixel(int x, int y, int spp) public constant returns (bytes1 r, bytes1 g, bytes1 b) {
     Vector memory color = trace(x, y, spp);
     return (bytes1(uint8(uint(color.x))), bytes1(uint8(uint(color.y))), bytes1(uint8(uint(color.z))));
   }
   // TraceScanline traces a single horizontal scanline of the configured image and
   // returns the RGB pixel value array. This method should be used for lower SPP
   // rendering to void the overhead of by-pixel EVM calls.
-  function TraceScanline(int y, int spp) public view returns (bytes memory) {
+  function TraceScanline(int y, int spp) public constant returns (bytes) {
     for (int x = 0; x < width; x++) {
       Vector memory color = trace(x, y, spp);
 
@@ -40,7 +40,7 @@ contract SnailTracer {
   // RGB pixel value array containing all the data top-down, left-to-right. This
   // method should only be callsed for very small images and SPP values as the
   // cumulative gas and memory costs can push the EVM too hard.
-  function TraceImage(int spp) public view returns (bytes memory) {
+  function TraceImage(int spp) public constant returns (bytes) {
     for (int y = height - 1; y >= 0; y--) {
       for (int x = 0; x < width; x++) {
         Vector memory color = trace(x, y, spp);
@@ -54,7 +54,7 @@ contract SnailTracer {
   }
   // Benchmark sets up an ephemeral image configuration and traces a select few
   // hand picked pixels to measure EVM execution performance.
-  function Benchmark() public view returns (bytes1 r, bytes1 g, bytes1 b) {
+  function Benchmark() public constant returns (bytes1 r, bytes1 g, bytes1 b) {
     // Configure the scene for benchmarking
     width = 1024; height = 768;
 
@@ -119,7 +119,7 @@ contract SnailTracer {
   function trace(int x, int y, int spp) internal returns (Vector color) {
     seed = uint32(y * width + x); // Deterministic image irrelevant of render chunks
 
-    delete(color);
+    color = Vector(0, 0, 0);
     for (int k=0; k<spp; k++) {
       Vector memory pixel = add(div(add(mul(deltaX, (1000000*x + rand()%500000)/width - 500000), mul(deltaY, (1000000*y + rand()%500000)/height - 500000)), 1000000), camera.direction);
       Ray    memory ray   = Ray(add(camera.origin, mul(pixel, 140)), norm(pixel), 0, false);
@@ -446,10 +446,10 @@ contract SnailTracer {
       }
     }
     // Intersect the ray with all the triangles
-    for (uint i=0; i<triangles.length; i++) {
-      int d = intersect(triangles[i], ray);
-      if (d > 0 && (dist == 0 || d < dist)) {
-        dist = d; p = Primitive.Triangle; id = i;
+    for (uint j=0; j<triangles.length; j++) {
+      int td = intersect(triangles[j], ray);
+      if (td > 0 && (dist == 0 || td < dist)) {
+        dist = td; p = Primitive.Triangle; id = j;
       }
     }
     return (dist, p, id);
