@@ -1,0 +1,189 @@
+{
+  "geth": {
+    "ten_thousand_hashes": {
+      "results": [
+        {
+          "command": "/Users/williamcory/bench/evms/go-ethereum/build/bin/evm run --codefile /var/folders/4s/d0wlfs9d00v4349cdqgd13f00000gn/T/tmpsdowdsoy.hex --gas 30000000 --input 30627b7c",
+          "mean": 0.021813592700000002,
+          "stddev": null,
+          "median": 0.021813592700000002,
+          "user": 0.019013279999999997,
+          "system": 0.0058122799999999995,
+          "min": 0.021813592700000002,
+          "max": 0.021813592700000002,
+          "times": [
+            0.021813592700000002
+          ],
+          "exit_codes": [
+            0
+          ]
+        }
+      ]
+    },
+    "erc20_transfer_bench": {
+      "results": [
+        {
+          "command": "/Users/williamcory/bench/evms/go-ethereum/build/bin/evm run --codefile /var/folders/4s/d0wlfs9d00v4349cdqgd13f00000gn/T/tmpnq8v39wn.hex --gas 30000000 --input 30627b7c",
+          "mean": 0.03230386214,
+          "stddev": null,
+          "median": 0.03230386214,
+          "user": 0.03110376,
+          "system": 0.0066279600000000004,
+          "min": 0.03230386214,
+          "max": 0.03230386214,
+          "times": [
+            0.03230386214
+          ],
+          "exit_codes": [
+            0
+          ]
+        }
+      ]
+    },
+    "erc20_mint_bench": {
+      "results": [
+        {
+          "command": "/Users/williamcory/bench/evms/go-ethereum/build/bin/evm run --codefile /var/folders/4s/d0wlfs9d00v4349cdqgd13f00000gn/T/tmpauy2sd1w.hex --gas 30000000 --input 30627b7c",
+          "mean": 0.02248623484,
+          "stddev": null,
+          "median": 0.02248623484,
+          "user": 0.02130586,
+          "system": 0.005758019999999999,
+          "min": 0.02248623484,
+          "max": 0.02248623484,
+          "times": [
+            0.02248623484
+          ],
+          "exit_codes": [
+            0
+          ]
+        }
+      ]
+    },
+    "erc20_approval_bench": {
+      "results": [
+        {
+          "command": "/Users/williamcory/bench/evms/go-ethereum/build/bin/evm run --codefile /var/folders/4s/d0wlfs9d00v4349cdqgd13f00000gn/T/tmpevd6ttdh.hex --gas 30000000 --input 30627b7c",
+          "mean": 0.022438208740000003,
+          "stddev": null,
+          "median": 0.022438208740000003,
+          "user": 0.01790118,
+          "system": 0.00413646,
+          "min": 0.022438208740000003,
+          "max": 0.022438208740000003,
+          "times": [
+            0.022438208740000003
+          ],
+          "exit_codes": [
+            0
+          ]
+        }
+      ]
+    },
+    "snailtracer": {
+      "results": [
+        {
+          "command": "/Users/williamcory/bench/evms/go-ethereum/build/bin/evm run --codefile /var/folders/4s/d0wlfs9d00v4349cdqgd13f00000gn/T/tmpxg5prn10.hex --gas 1000000000 --input 30627b7c",
+          "mean": 0.12209721075999999,
+          "stddev": null,
+          "median": 0.12209721075999999,
+          "user": 0.12152531999999999,
+          "system": 0.01188602,
+          "min": 0.12209721075999999,
+          "max": 0.12209721075999999,
+          "times": [
+            0.12209721075999999
+          ],
+          "exit_codes": [
+            0
+          ]
+        }
+      ]
+    }
+  },
+  "guillotine": {
+    "ten_thousand_hashes": {
+      "results": [
+        {
+          "command": "/Users/williamcory/bench/evms/Guillotine/apps/cli/guillotine-bench run --codefile /var/folders/4s/d0wlfs9d00v4349cdqgd13f00000gn/T/tmp4x7egd5z.hex --gas 30000000 --input 30627b7c",
+          "mean": 0.006795890380000001,
+          "stddev": null,
+          "median": 0.006795890380000001,
+          "user": 0.00405306,
+          "system": 0.0022819599999999995,
+          "min": 0.006795890380000001,
+          "max": 0.006795890380000001,
+          "times": [
+            0.006795890380000001
+          ],
+          "exit_codes": [
+            0
+          ]
+        }
+      ]
+    },
+    "erc20_transfer_bench": {
+      "results": [
+        {
+          "command": "/Users/williamcory/bench/evms/Guillotine/apps/cli/guillotine-bench run --codefile /var/folders/4s/d0wlfs9d00v4349cdqgd13f00000gn/T/tmp2y49swdk.hex --gas 30000000 --input 30627b7c",
+          "mean": 0.011553246960000001,
+          "stddev": null,
+          "median": 0.011553246960000001,
+          "user": 0.009030139999999999,
+          "system": 0.0021356599999999997,
+          "min": 0.011553246960000001,
+          "max": 0.011553246960000001,
+          "times": [
+            0.011553246960000001
+          ],
+          "exit_codes": [
+            0
+          ]
+        }
+      ]
+    },
+    "erc20_mint_bench": {
+      "error": "Hyperfine failed: Error: Command terminated with non-zero exit code 1 in the first warmup run. Use the '-i'/'--ignore-failure' option if you want to ignore this. Alternatively, use the '--show-output' option to debug what went wrong.\n"
+    },
+    "erc20_approval_bench": {
+      "results": [
+        {
+          "command": "/Users/williamcory/bench/evms/Guillotine/apps/cli/guillotine-bench run --codefile /var/folders/4s/d0wlfs9d00v4349cdqgd13f00000gn/T/tmppuiax20e.hex --gas 30000000 --input 30627b7c",
+          "mean": 0.012701323180000001,
+          "stddev": null,
+          "median": 0.012701323180000001,
+          "user": 0.009659139999999998,
+          "system": 0.00236386,
+          "min": 0.012701323180000001,
+          "max": 0.012701323180000001,
+          "times": [
+            0.012701323180000001
+          ],
+          "exit_codes": [
+            0
+          ]
+        }
+      ]
+    },
+    "snailtracer": {
+      "results": [
+        {
+          "command": "/Users/williamcory/bench/evms/Guillotine/apps/cli/guillotine-bench run --codefile /var/folders/4s/d0wlfs9d00v4349cdqgd13f00000gn/T/tmpre6sos2o.hex --gas 1000000000 --input 30627b7c",
+          "mean": 0.03373421066,
+          "stddev": null,
+          "median": 0.03373421066,
+          "user": 0.02875908,
+          "system": 0.00410782,
+          "min": 0.03373421066,
+          "max": 0.03373421066,
+          "times": [
+            0.03373421066
+          ],
+          "exit_codes": [
+            0
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "geth": {
+    "ten_thousand_hashes": {
+      "error": "'<' not supported between instances of 'NoneType' and 'float'"
+    }
+  },
+  "guillotine": {
+    "ten_thousand_hashes": {
+      "error": "'<' not supported between instances of 'NoneType' and 'float'"
+    }
+  }
+}
