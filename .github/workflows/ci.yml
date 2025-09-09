@@ -63,7 +63,7 @@ jobs:
       run: |
         forge test -vvv
 
-  benchmark:
+  go-test:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
@@ -75,12 +75,19 @@ jobs:
       with:
         go-version: '1.21'
     
-    - name: Build benchmark runner
+    - name: Install dependencies
       run: |
-        cd evms/benchmark-runner
-        make build
+        go mod download
+        go mod tidy
     
-    - name: Run benchmarks
+    - name: Run Go tests
       run: |
-        cd evms/benchmark-runner
-        ./benchmark-runner-simple
+        go test -v ./...
+    
+    - name: Build Go CLI
+      run: |
+        make build-go
+    
+    - name: Verify build
+      run: |
+        ./bench --version
