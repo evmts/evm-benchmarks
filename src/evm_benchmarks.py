@@ -117,7 +117,7 @@ def get_evm_benchmarks() -> Dict[str, Dict[str, Any]]:
                         "type": "evm",
                         "bytecode": snailtracer_bytecode,
                         "calldata": "30627b7c",  # Benchmark() selector
-                        "gas": 100000000,  # High gas limit for compute intensive task
+                        "gas": 1000000000,  # Very high gas limit for compute intensive task (1 billion)
                         "requires": []
                     }
         except Exception:
@@ -141,14 +141,157 @@ def find_geth_binary() -> Optional[str]:
     return None
 
 
-def run_evm_benchmark(
+def find_guillotine_binary() -> Optional[str]:
+    """Find the Guillotine benchmark binary."""
+    # Check for the guillotine-bench binary in apps/cli
+    guillotine_bench = Path("apps/cli/guillotine-bench")
+    if guillotine_bench.exists():
+        return str(guillotine_bench.absolute())
+    
+    # Check in evms/Guillotine as well
+    built_guillotine = Path("evms/Guillotine/apps/cli/guillotine-bench")
+    if built_guillotine.exists():
+        return str(built_guillotine.absolute())
+    
+    return None
+
+
+def run_guillotine_benchmark(
     name: str,
     config: Dict[str, Any],
     iterations: int = 10,
     use_hyperfine: bool = True,
     verbose: bool = False
 ) -> Dict[str, Any]:
-    """Run an EVM benchmark using geth's evm command."""
+    """Run an EVM benchmark using Guillotine."""
+    
+    guillotine_binary = find_guillotine_binary()
+    if not guillotine_binary:
+        raise RuntimeError("guillotine-bench not found. Please ensure Guillotine is built.")
+    
+    # Prepare the bytecode and calldata
+    bytecode = config["bytecode"]
+    calldata = config.get("calldata", "")
+    
+    if use_hyperfine:
+        # Create a temporary file for the bytecode
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.hex', delete=False) as f:
+            f.write(bytecode)
+            temp_file = f.name
+        
+        try:
+            # Build the command for guillotine-bench
+            cmd_args = [
+                guillotine_binary,
+                "run",
+                "--codefile", temp_file,
+                "--gas", str(config.get("gas", 30000000))
+            ]
+            
+            if calldata:
+                cmd_args.extend(["--input", calldata])
+            
+            # Use hyperfine for benchmarking
+            # Set environment to suppress Guillotine debug output
+            env = os.environ.copy()
+            env['GUILLOTINE_LOG_LEVEL'] = 'error'
+            env['ZIG_LOG_LEVEL'] = 'error'
+            
+            cmd = [
+                "hyperfine",
+                "--runs", str(iterations),
+                "--warmup", "3",
+                "--export-json", f"results_{name}.json",
+                "--",
+                " ".join(cmd_args)
+            ]
+            
+            if verbose:
+                print(f"Running Guillotine benchmark '{name}' with hyperfine...")
+                print(f"Command: {' '.join(cmd)}")
+            
+            result = subprocess.run(cmd, capture_output=True, text=True, env=env)
+            
+            if result.returncode == 0:
+                # Parse hyperfine results
+                results_file = f"results_{name}.json"
+                if Path(results_file).exists():
+                    with open(results_file, 'r') as f:
+                        hyperfine_results = json.load(f)
+                        return {
+                            "name": name,
+                            "tool": "hyperfine",
+                            "evm": "guillotine",
+                            "results": hyperfine_results
+                        }
+                else:
+                    return {
+                        "name": name,
+                        "tool": "hyperfine",
+                        "evm": "guillotine",
+                        "output": result.stdout
+                    }
+            else:
+                raise RuntimeError(f"Hyperfine failed: {result.stderr}")
+        finally:
+            # Clean up temp file
+            if Path(temp_file).exists():
+                os.unlink(temp_file)
+    else:
+        # Direct execution without hyperfine
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.hex', delete=False) as f:
+            f.write(bytecode)
+            temp_file = f.name
+        
+        try:
+            cmd = [
+                guillotine_binary,
+                "run",
+                "--codefile", temp_file,
+                "--gas", str(config.get("gas", 30000000))
+            ]
+            
+            if calldata:
+                cmd.extend(["--input", calldata])
+        
+            print(f"Running Guillotine benchmark '{name}' directly...")
+            
+            # Set environment to suppress Guillotine debug output
+            env = os.environ.copy()
+            env['GUILLOTINE_LOG_LEVEL'] = 'error'
+            env['ZIG_LOG_LEVEL'] = 'error'
+            
+            for i in range(iterations):
+                result = subprocess.run(cmd, capture_output=True, text=True, env=env)
+                if result.returncode != 0:
+                    raise RuntimeError(f"Guillotine execution failed: {result.stderr}")
+            
+            return {
+                "name": name,
+                "tool": "guillotine",
+                "evm": "guillotine",
+                "output": f"Completed {iterations} iterations"
+            }
+        finally:
+            # Clean up temp file
+            if Path(temp_file).exists():
+                os.unlink(temp_file)
+
+
+def run_evm_benchmark(
+    name: str,
+    config: Dict[str, Any],
+    iterations: int = 10,
+    use_hyperfine: bool = True,
+    verbose: bool = False,
+    evm_type: str = "geth"
+) -> Dict[str, Any]:
+    """Run an EVM benchmark using the specified EVM implementation."""
+    
+    if evm_type == "guillotine":
+        return run_guillotine_benchmark(name, config, iterations, use_hyperfine, verbose)
+    
+    # Default to geth implementation
     
     geth_binary = find_geth_binary()
     if not geth_binary:
@@ -214,12 +357,14 @@ def run_evm_benchmark(
                         return {
                             "name": name,
                             "tool": "hyperfine",
+                            "evm": "geth",
                             "results": hyperfine_results
                         }
                 else:
                     return {
                         "name": name,
                         "tool": "hyperfine",
+                        "evm": "geth",
                         "output": result.stdout
                     }
             else:
@@ -254,6 +399,7 @@ def run_evm_benchmark(
             return {
                 "name": name,
                 "tool": "geth-evm",
+                "evm": "geth",
                 "output": f"Completed {iterations} iterations"
             }
         finally:
