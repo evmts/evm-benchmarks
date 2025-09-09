@@ -1,9 +1,9 @@
-use anyhow::{Result, bail};
+use anyhow::{Result, bail, Context};
 use alloy_primitives::{Address, U256, Bytes};
 use revm::{
     db::{CacheDB, EmptyDB},
-    primitives::{AccountInfo, Bytecode, ExecutionResult, Output, TransactTo, TxEnv, keccak256},
-    Evm, EvmBuilder,
+    primitives::{AccountInfo, Bytecode, ExecutionResult, TransactTo, keccak256},
+    EvmBuilder,
 };
 use std::str::FromStr;
 use std::time::Duration;
@@ -119,7 +119,30 @@ fn execute_geth(_bytecode: &str, _calldata: &str, _gas_limit: u64) -> Result<()>
     bail!("Geth execution not yet implemented. Use FFI to call go-ethereum.")
 }
 
-fn execute_guillotine(_bytecode: &str, _calldata: &str, _gas_limit: u64) -> Result<()> {
-    // Guillotine execution via CLI binary
-    bail!("Guillotine execution not yet implemented. Use the guillotine-bench binary.")
+fn execute_guillotine(bytecode_hex: &str, calldata_hex: &str, gas_limit: u64) -> Result<()> {
+    use crate::evms::guillotine::GuillotineExecutor;
+    use crate::evm::EvmExecutor as _;
+    
+    // Strip 0x prefix if present
+    let bytecode_hex = bytecode_hex.strip_prefix("0x").unwrap_or(bytecode_hex);
+    let calldata_hex = calldata_hex.strip_prefix("0x").unwrap_or(calldata_hex);
+    
+    // Parse bytecode and calldata
+    let bytecode = hex::decode(bytecode_hex)
+        .context("Failed to decode bytecode hex")?;
+    let calldata = hex::decode(calldata_hex)
+        .context("Failed to decode calldata hex")?;
+    
+    // Create and execute with guillotine
+    let mut executor = GuillotineExecutor::new()
+        .context("Failed to create Guillotine executor")?;
+    
+    let result = executor.execute(bytecode, calldata, gas_limit)
+        .context("Failed to execute with Guillotine")?;
+    
+    if result.success {
+        Ok(())
+    } else {
+        bail!("Guillotine execution failed - Gas: {}", result.gas_used)
+    }
 }
