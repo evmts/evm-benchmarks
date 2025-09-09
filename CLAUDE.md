@@ -1,7 +1,10 @@
 # EVM Benchmark Repository
 
 ## Project Overview
-This repository contains benchmarking tools for comparing Ethereum Virtual Machine (EVM) implementations. The primary goal is to provide accurate, reproducible performance measurements across different EVM implementations including **geth** and **Guillotine**.
+This repository contains benchmarking tools for comparing Ethereum Virtual Machine (EVM) implementations. The primary goal is to provide accurate, reproducible performance measurements across different EVM implementations including **geth**, **guillotine**, and **revm**.
+
+## Implementation Language
+This project is implemented in **Go** with an interactive TUI built using Bubble Tea. The previous Python implementation has been deprecated in favor of better performance and a richer user experience.
 
 ## Critical Benchmark Integrity Rules
 
@@ -22,24 +25,32 @@ Benchmarks are only valuable if they measure real performance. Any compromise in
 ## Repository Structure
 ```
 bench/
-├── src/
-│   ├── cli.py                 # Enhanced CLI with matrix benchmarking support
-│   ├── evm_benchmarks.py      # Core EVM benchmark logic for geth & Guillotine
-│   └── cli_display.py         # Rich terminal display utilities
+├── cmd/bench/                 # CLI entry point
+│   └── main.go               # Main application with urfave/cli
+├── internal/
+│   ├── benchmark/            # Core benchmark logic
+│   │   ├── evm.go           # EVM benchmark definitions
+│   │   └── runner.go        # Benchmark execution
+│   └── tui/                 # Bubble Tea TUI components
+│       ├── model.go         # TUI state management
+│       └── styles.go        # Lipgloss styling
 ├── benchmarks/
-│   ├── solidity/              # Solidity benchmark contracts
+│   ├── solidity/            # Solidity benchmark contracts
 │   │   ├── TenThousandHashes.sol
 │   │   ├── ERC20Transfer.sol
 │   │   ├── ERC20Mint.sol
 │   │   └── ERC20ApprovalTransfer.sol
-│   └── snailtracer/           # Ray tracing benchmark
-│       ├── snailtracer.sol    # Solidity 0.4.26 implementation
+│   └── snailtracer/         # Ray tracing benchmark
+│       ├── snailtracer.sol  # Solidity 0.4.26 implementation
 │       └── snailtracer_runtime.hex  # Compiled bytecode
 ├── evms/
-│   ├── go-ethereum/           # Geth EVM implementation (git submodule)
-│   └── guillotine-go-sdk/     # Guillotine EVM implementation (git submodule)
-├── out/                       # Foundry build artifacts
-└── results_*.json             # Benchmark results for each test
+│   ├── go-ethereum/         # Geth EVM implementation (git submodule)
+│   ├── guillotine-go-sdk/   # Guillotine EVM implementation (git submodule)
+│   └── revm/                # Revm implementation (git submodule)
+├── out/                     # Foundry build artifacts
+├── go.mod                   # Go module definition
+├── Makefile                 # Build automation
+└── results_*.json           # Benchmark results for each test
 ```
 
 ## Supported EVM Implementations
@@ -77,43 +88,52 @@ bench/
 
 ### Basic Usage
 ```bash
-# Run all benchmarks on default EVM (geth)
-python src/cli.py run
+# Build the Go CLI
+make build-go
+
+# Run all benchmarks with TUI
+./bench run
 
 # Run specific benchmark
-python src/cli.py run ten_thousand_hashes
+./bench run ten_thousand_hashes
+
+# Run without TUI
+./bench run --no-tui
 
 # Run on specific EVM
-python src/cli.py run --evm guillotine
+./bench run --evm guillotine --no-tui
 
 # Run matrix benchmark across multiple EVMs
-python src/cli.py run --evms geth,guillotine
-python src/cli.py run --all  # Run on all available EVMs
+./bench run --evms geth,guillotine
+./bench run --all  # Run on all available EVMs
 ```
 
 ### Advanced Options
 ```bash
 # Customize iterations and warmup
-python src/cli.py run --iterations 20 --warmup 5
+./bench run --iterations 20 --warmup 5 --no-tui
 
 # Export results
-python src/cli.py run --output results.json --export-json hyperfine.json
+./bench run --output results.json --export-json hyperfine.json
 
 # Verbose output
-python src/cli.py run -v
+./bench run -v --no-tui
 ```
 
 ### Matrix Benchmarking
 The CLI supports running benchmarks across multiple EVM implementations simultaneously:
 ```bash
 # Compare geth and guillotine
-python src/cli.py run --evms geth,guillotine
+./bench run --evms geth,guillotine
 
 # Run all benchmarks on all EVMs
-python src/cli.py run --all
+./bench run --all --no-tui
+
+# Compare implementations
+./bench compare geth guillotine revm
 
 # Save matrix results
-python src/cli.py run --all --output full_matrix.json
+./bench run --all --output full_matrix.json
 ```
 
 Matrix results include:
@@ -124,20 +144,19 @@ Matrix results include:
 
 ## Key Features
 
-### 1. Hyperfine Integration
+### 1. Interactive TUI (Bubble Tea)
+The Go implementation features a beautiful terminal UI:
+- Real-time progress tracking
+- Keyboard navigation (↑/↓, j/k, Enter, a, q)
+- Color-coded status indicators
+- Live benchmark results
+
+### 2. Hyperfine Integration
 All benchmarks use [hyperfine](https://github.com/sharkdp/hyperfine) for accurate measurements:
 - Statistical analysis of multiple runs
 - Warmup iterations to stabilize performance
 - JSON export for detailed analysis
 - Automatic outlier detection
-
-### 2. Rich CLI Display
-Beautiful terminal output with:
-- Progress bars for benchmark execution
-- Colored output for better readability
-- Spinner animations during long operations
-- Matrix summary tables for comparisons
-- Real-time status updates
 
 ### 3. Dynamic Benchmark Discovery
 - Automatically detects compiled Solidity contracts
@@ -146,7 +165,7 @@ Beautiful terminal output with:
 - Skips unavailable benchmarks gracefully
 
 ### 4. Unified Benchmark Interface
-Both geth and Guillotine use the same benchmark execution flow:
+All EVM implementations use the same benchmark execution flow:
 1. Create temporary bytecode file
 2. Execute with specified gas limit and calldata
 3. Measure execution time via hyperfine
@@ -183,49 +202,57 @@ cargo build --release -p revme
 ### Adding New Benchmarks
 1. Create Solidity contract in `benchmarks/solidity/`
 2. Compile with Foundry: `forge build`
-3. Add configuration in `evm_benchmarks.py`:
-```python
-benchmarks["new_benchmark"] = {
-    "description": "Description of benchmark",
-    "category": "compute|token|storage",
-    "type": "evm",
-    "bytecode": get_contract_bytecode("ContractName"),
-    "calldata": get_function_selector("functionName()"),
-    "gas": 30000000,
-    "requires": []
+3. Add configuration in `internal/benchmark/evm.go`:
+```go
+if bytecode, err := GetContractBytecode("ContractName"); err == nil {
+    benchmarks["new_benchmark"] = &Benchmark{
+        Name:        "new_benchmark",
+        Description: "Description of benchmark",
+        Category:    "compute|token|storage",
+        Type:        "evm",
+        Bytecode:    bytecode,
+        Calldata:    GetFunctionSelector("functionName()"),
+        Gas:         30000000,
+    }
 }
 ```
 
 ### Adding New EVM Implementation
-1. Add binary finder function:
-```python
-def find_new_evm_binary() -> Optional[str]:
-    # Logic to locate the EVM binary
-    pass
+1. Add binary finder function in `internal/benchmark/evm.go`:
+```go
+func FindNewEVMBinary() (string, error) {
+    // Logic to locate the EVM binary
+}
 ```
 
-2. Add runner function:
-```python
-def run_new_evm_benchmark(name, config, iterations, use_hyperfine, verbose):
-    # Implementation-specific execution logic
-    pass
+2. Add runner function in `internal/benchmark/runner.go`:
+```go
+func runNewEVMBenchmark(bench *Benchmark, iterations int, useHyperfine bool, verbose bool) (*BenchmarkResult, error) {
+    // Implementation-specific execution logic
+}
 ```
 
-3. Update `run_evm_benchmark()` to route to new implementation
+3. Update `RunEVMBenchmark()` to route to new implementation
 
 ### Testing
 ```bash
-# Run unit tests
-pytest tests/
+# Run Go tests
+make test-go
 
-# Type checking
-mypy src/
+# Run with verbose output
+go test -v ./...
 
-# Linting
-ruff check src/
+# Run Solidity tests
+forge test
+
+# Format code
+go fmt ./...
+
+# Run vet
+go vet ./...
 
 # Run a quick benchmark test
-python src/cli.py run ten_thousand_hashes --iterations 3
+./bench run ten_thousand_hashes --iterations 3 --no-tui
 ```
 
 ## Performance Considerations
@@ -291,7 +318,22 @@ Results are stored as JSON with hyperfine statistics:
    - Run `forge build` to compile Solidity contracts
    - Check `out/` directory for compiled artifacts
 
+6. **TUI not working**
+   - Use `--no-tui` flag for non-interactive mode
+   - Ensure terminal supports ANSI escape codes
+   - Check that TERM environment variable is set
+
+7. **Build errors**
+   - Update dependencies: `go mod tidy`
+   - Clear module cache: `go clean -modcache`
+
 ## Recent Updates
+
+### Go Implementation (v3.0)
+- Complete rewrite in Go for better performance
+- Interactive TUI with Bubble Tea
+- Improved error handling and type safety
+- Concurrent benchmark execution support
 
 ### Matrix Benchmarking (v2.0)
 - Compare multiple EVM implementations side-by-side
@@ -302,11 +344,6 @@ Results are stored as JSON with hyperfine statistics:
 - Full support for Guillotine EVM benchmarking
 - Custom runner for Zig-based implementation
 - FFI bridge via Go SDK
-
-### Enhanced CLI Display (v1.2)
-- Rich terminal colors and formatting
-- Progress bars and spinners
-- Clear benchmark status indicators
 
 ### Snailtracer Benchmark (v1.0)
 - Added compute-intensive ray tracing benchmark

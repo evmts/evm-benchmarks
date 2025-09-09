@@ -1,169 +1,232 @@
 # EVM Benchmark Suite
 
-A comprehensive benchmarking framework for comparing Ethereum Virtual Machine (EVM) implementations with focus on performance accuracy and reproducibility.
+A modern benchmarking framework for comparing Ethereum Virtual Machine (EVM) implementations, built with Go and featuring an interactive terminal UI.
 
 ## Overview
 
 This repository provides a standardized benchmarking suite for evaluating and comparing different EVM implementations including:
 - **geth** (go-ethereum)
-- **reth** (Rust Ethereum)
-- **evms** (Ethereum Virtual Machine in Zig)
+- **guillotine** (Zig-based EVM with Go SDK)
+- **revm** (Rust-based EVM)
 
 The framework measures real execution performance using production-grade test scenarios without any mocks, stubs, or simulated behavior.
 
 ## Features
 
-- **Real EVM Execution**: All benchmarks execute actual EVM bytecode on real implementations
-- **Multiple Benchmark Categories**:
-  - Computational benchmarks (keccak256 hashing)
-  - Token operations (ERC20 transfers, minting, approvals)
-  - Complex contract interactions
-- **Hyperfine Integration**: Uses [hyperfine](https://github.com/sharkdp/hyperfine) for statistically rigorous performance measurements
-- **Automated Testing**: Comprehensive test suite with CI/CD integration
-- **Docker Support**: Containerized environment for reproducible benchmarking
-- **Extensible Architecture**: Easy to add new benchmarks and EVM implementations
+- 🎨 **Interactive TUI**: Beautiful terminal UI built with [Bubble Tea](https://github.com/charmbracelet/bubbletea)
+- 📊 **Matrix Benchmarking**: Compare multiple EVM implementations side-by-side
+- 🚀 **High Performance**: Native Go implementation with concurrent execution
+- 📈 **Statistical Analysis**: Hyperfine integration for rigorous performance measurements
+- 🔧 **Multiple EVMs**: Support for Geth, Guillotine, and Revm
+- ✅ **Real EVM Execution**: All benchmarks execute actual EVM bytecode on real implementations
 
 ## Quick Start
 
 ### Prerequisites
 
-- Python 3.7+
-- [Foundry](https://book.getfoundry.sh/getting-started/installation) (for Solidity compilation)
-- [Hyperfine](https://github.com/sharkdp/hyperfine#installation) (for benchmarking)
-- Go 1.19+ (for building geth)
+- Go 1.20+ ([install](https://golang.org/doc/install))
+- [Hyperfine](https://github.com/sharkdp/hyperfine#installation) for statistical benchmarking
+- [Foundry](https://book.getfoundry.sh/getting-started/installation) for Solidity compilation
 - Make
 
 ### Installation
 
 1. Clone the repository with submodules:
 ```bash
-git clone --recursive https://github.com/yourusername/evm-bench.git
-cd evm-bench
+git clone --recursive https://github.com/williamcory/bench.git
+cd bench
 ```
 
-2. Install the benchmarking framework:
+2. Install Go dependencies:
 ```bash
-make install
+go mod download
 ```
 
-3. Install development dependencies and compile contracts:
+3. Build the CLI:
 ```bash
-make dev
+make build-go
+# or
+go build -o bench cmd/bench/main.go
 ```
 
-4. Build the contracts:
+4. Build the Solidity contracts:
 ```bash
-make build
+forge build
 ```
 
 ### Running Benchmarks
 
-List available benchmarks:
+#### Interactive Mode (TUI)
 ```bash
-evm-bench list
+# Run with interactive TUI
+./bench run
+
+# Run specific benchmark
+./bench run ten_thousand_hashes
 ```
 
-Run all benchmarks:
+In TUI mode:
+- `↑/↓` or `j/k`: Navigate benchmarks
+- `Enter`: Run selected benchmark
+- `a`: Run all benchmarks
+- `q`: Quit
+
+#### Command Line Mode
 ```bash
-evm-bench run
+# Run without TUI
+./bench run --no-tui
+
+# Run with specific iterations
+./bench run --iterations 20 --warmup 5 --no-tui
+
+# Run on specific EVM
+./bench run --evm geth --no-tui
+./bench run --evm guillotine --no-tui
+./bench run --evm revm --no-tui
 ```
 
-Run specific benchmark:
+#### Matrix Benchmarking
 ```bash
-evm-bench run ten_thousand_hashes
+# Compare multiple EVMs
+./bench run --evms geth,guillotine
+
+# Run on all available EVMs
+./bench run --all --no-tui
+
+# Compare implementations
+./bench compare geth guillotine revm
+
+# Save results
+./bench run --all --output matrix_results.json
 ```
 
-Run with custom iterations:
-```bash
-evm-bench run --iterations 20 --warmup 5
-```
-
-Export results:
-```bash
-evm-bench run --export-json results.json --export-markdown results.md
-```
-
-## Benchmark Categories
+## Available Benchmarks
 
 ### Computational Benchmarks
-- **ten_thousand_hashes**: Executes 20,000 keccak256 hash operations
-- **snailtracer**: Complex computational workload
+- **ten_thousand_hashes**: Execute 10,000 keccak256 hash operations
+- **snailtracer**: Ray tracing benchmark (1B gas limit, extremely compute intensive)
 
 ### Token Operations
-- **erc20_transfer_bench**: Measures ERC20 token transfer performance
-- **erc20_mint_bench**: Benchmarks token minting operations
-- **erc20_approval_bench**: Tests approval and transferFrom patterns
+- **erc20_transfer_bench**: ERC20 token transfer performance
+- **erc20_mint_bench**: Token minting operations
+- **erc20_approval_bench**: Approval and transferFrom patterns
 
 ## Project Structure
 
 ```
-.
-├── benchmarks/           # Solidity benchmark contracts
-│   ├── erc20/           # ERC20 token benchmarks
-│   └── ten-thousand-hashes/  # Hashing benchmarks
-├── src/                 # Python benchmark runner
-│   ├── cli.py          # CLI interface
-│   └── evm_benchmarks.py  # EVM benchmark configurations
-├── evms/               # Git submodule for evms implementation
-├── tests/              # Unit tests
+bench/
+├── cmd/bench/           # CLI entry point
+│   └── main.go         # Main application with urfave/cli
+├── internal/
+│   ├── benchmark/      # Core benchmark logic
+│   │   ├── evm.go     # EVM benchmark definitions
+│   │   └── runner.go  # Benchmark execution
+│   └── tui/           # Bubble Tea TUI components
+│       ├── model.go   # TUI state management
+│       └── styles.go  # Lipgloss styling
+├── benchmarks/         # Solidity benchmark contracts
+│   ├── solidity/      # Contract source files
+│   └── snailtracer/   # Ray tracing benchmark
+├── evms/              # EVM implementations (git submodules)
+│   ├── go-ethereum/   # Geth
+│   ├── guillotine-go-sdk/ # Guillotine
+│   └── revm/          # Revm
+├── out/               # Foundry build artifacts
+├── go.mod             # Go module definition
 ├── Makefile           # Build automation
-├── foundry.toml       # Foundry configuration
-└── Dockerfile         # Container definition
+└── foundry.toml       # Foundry configuration
+```
+
+## Building EVM Implementations
+
+### Geth
+```bash
+cd evms/go-ethereum
+make geth
+make evm  # Required for benchmarking
+```
+
+### Guillotine
+```bash
+cd evms/guillotine-go-sdk
+zig build
+
+# Build the benchmark CLI
+cd apps/cli
+go build -o guillotine-bench .
+```
+
+### Revm
+```bash
+cd evms/revm
+cargo build --release -p revme
+# Binary: evms/revm/target/release/revme
 ```
 
 ## Development
 
 ### Running Tests
-
-Run all tests:
 ```bash
-make test
-```
+# Run all Go tests
+make test-go
 
-Run Python tests only:
-```bash
-pytest tests/ -v
-```
+# Run with verbose output
+go test -v ./...
 
-Run Solidity tests:
-```bash
+# Run Solidity tests
 forge test
 ```
 
 ### Code Quality
-
-Lint code:
 ```bash
-make lint
+# Format code
+go fmt ./...
+
+# Run go vet
+go vet ./...
+
+# Run linter (if installed)
+golangci-lint run
 ```
 
-Format code:
-```bash
-make format
+### Adding New Benchmarks
+
+1. Create Solidity contract in `benchmarks/solidity/`
+2. Compile with Foundry: `forge build`
+3. Add configuration in `internal/benchmark/evm.go`:
+
+```go
+if bytecode, err := GetContractBytecode("NewContract"); err == nil {
+    benchmarks["new_benchmark"] = &Benchmark{
+        Name:        "new_benchmark",
+        Description: "Description here",
+        Category:    "category",
+        Type:        "evm",
+        Bytecode:    bytecode,
+        Calldata:    GetFunctionSelector("run()"),
+        Gas:         30000000,
+    }
+}
 ```
 
-### Building from Source
+## Makefile Targets
 
-Build all components:
 ```bash
-make all
-```
+# Build and run
+make build-go         # Build Go CLI
+make run-go           # Run benchmarks
+make test-go          # Run tests
 
-Clean build artifacts:
-```bash
-make clean
-```
+# Benchmark specific EVMs
+make bench-geth       # Run on geth
+make bench-guillotine # Run on guillotine  
+make bench-revm       # Run on revm
+make bench-matrix     # Run matrix benchmark
 
-## Docker Usage
-
-Build Docker image:
-```bash
-make docker-build
-```
-
-Run benchmarks in container:
-```bash
-make docker-run
+# Maintenance
+make clean            # Clean build artifacts
+make setup-go         # Setup Go dependencies
+make setup-foundry    # Install Foundry
 ```
 
 ## Benchmark Integrity
@@ -177,55 +240,66 @@ This framework maintains strict benchmark integrity by:
 
 See [CLAUDE.md](./CLAUDE.md) for detailed integrity guidelines.
 
-## Contributing
+## Results Format
 
-We welcome contributions! Please see [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines on:
-- Code style and standards
-- Testing requirements
-- Pull request process
-- Issue reporting
+Results are exported in JSON format compatible with hyperfine:
 
-## CI/CD
-
-The project uses GitHub Actions for continuous integration:
-- Automated testing on pull requests
-- Code quality checks
-- Benchmark regression detection
-- Docker image building
-
-## Results Analysis
-
-Benchmark results are exported in JSON format compatible with hyperfine. To analyze results:
-
-```python
-python show_results.py
+```json
+{
+  "results": [
+    {
+      "command": "evm run ...",
+      "mean": 0.123,
+      "stddev": 0.005,
+      "median": 0.122,
+      "min": 0.118,
+      "max": 0.130,
+      "times": [0.118, 0.122, ...]
+    }
+  ]
+}
 ```
-
-This will display:
-- Mean execution time
-- Standard deviation
-- Min/max times
-- Comparative analysis between implementations
 
 ## Troubleshooting
 
 ### Hyperfine not found
-Install hyperfine using your package manager:
-- macOS: `brew install hyperfine`
-- Ubuntu: `apt install hyperfine`
-- Cargo: `cargo install hyperfine`
-
-### Contract compilation fails
-Ensure Foundry is installed:
 ```bash
-make setup-foundry
+# macOS
+brew install hyperfine
+
+# Linux
+apt install hyperfine
+
+# Cargo
+cargo install hyperfine
 ```
 
-### EVM binary not found
-Build the EVM implementations:
+### Geth not found
 ```bash
-cd evms/go-ethereum && make all
+cd evms/go-ethereum
+make geth && make evm
 ```
+
+### TUI not working
+- Use `--no-tui` flag for non-interactive mode
+- Ensure terminal supports ANSI escape codes
+
+### Build errors
+```bash
+# Update dependencies
+go mod tidy
+
+# Clear module cache
+go clean -modcache
+```
+
+## Contributing
+
+We welcome contributions! Please ensure:
+- Code passes all tests
+- Benchmarks maintain integrity (no mocks/stubs)
+- Documentation is updated
+- Pull requests include test coverage
 
 ## License
 
@@ -233,10 +307,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## Acknowledgments
 
+- [Bubble Tea](https://github.com/charmbracelet/bubbletea) for the TUI framework
 - [Hyperfine](https://github.com/sharkdp/hyperfine) for statistical benchmarking
 - [Foundry](https://github.com/foundry-rs/foundry) for Solidity tooling
 - The Ethereum community for EVM implementations
-
-## Contact
-
-For questions, issues, or contributions, please open an issue on GitHub.
