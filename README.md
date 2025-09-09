@@ -11,20 +11,20 @@ Latest benchmark results comparing Guillotine and Revm EVMs (10 iterations):
 
 | EVM | Mean (s) | Std Dev | Min (s) | Max (s) | Median (s) |
 |-----|----------|---------|---------|---------|------------|
-| ⚡ guillotine | 0.0438 | 0.0005 | 0.0431 | 0.0444 | 0.0438 |
-| revm | 0.0510 | 0.0008 | 0.0503 | 0.0528 | 0.0507 |
+| ⚡ guillotine | 0.0475 | 0.0011 | 0.0463 | 0.0502 | 0.0474 |
+| revm | 0.0526 | 0.0004 | 0.0518 | 0.0531 | 0.0528 |
 
-**Performance**: guillotine is 1.17x faster than revm
+**Performance**: guillotine is 1.11x faster than revm
 
 ### ten_thousand_hashes
 *Execute 10,000 keccak256 hash operations*
 
 | EVM | Mean (s) | Std Dev | Min (s) | Max (s) | Median (s) |
 |-----|----------|---------|---------|---------|------------|
-| ⚡ guillotine | 0.0504 | 0.0006 | 0.0499 | 0.0517 | 0.0502 |
-| revm | 0.0749 | 0.0006 | 0.0741 | 0.0756 | 0.0749 |
+| ⚡ guillotine | 0.0545 | 0.0006 | 0.0536 | 0.0554 | 0.0545 |
+| revm | 0.0759 | 0.0005 | 0.0749 | 0.0764 | 0.0760 |
 
-**Performance**: guillotine is 1.48x faster than revm
+**Performance**: guillotine is 1.39x faster than revm
 
 ### erc20_transfer_bench
 *Benchmark ERC20 transfer operations*
@@ -51,10 +51,10 @@ Latest benchmark results comparing Guillotine and Revm EVMs (10 iterations):
 
 | EVM | Mean (s) | Std Dev | Min (s) | Max (s) | Median (s) |
 |-----|----------|---------|---------|---------|------------|
-| ⚡ guillotine | 0.2159 | 0.0017 | 0.2130 | 0.2185 | 0.2160 |
-| revm | 0.2772 | 0.0028 | 0.2736 | 0.2816 | 0.2777 |
+| ⚡ guillotine | 0.2349 | 0.0011 | 0.2333 | 0.2367 | 0.2346 |
+| revm | 0.2825 | 0.0007 | 0.2814 | 0.2835 | 0.2827 |
 
-**Performance**: guillotine is 1.28x faster than revm
+**Performance**: guillotine is 1.20x faster than revm
 
 ## Features
 
