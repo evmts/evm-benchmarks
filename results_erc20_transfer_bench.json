@@ -1,36 +1,18 @@
 {
   "results": [
     {
-      "command": "/Users/williamcory/bench/evms/go-ethereum/build/bin/evm run --codefile /var/folders/4s/d0wlfs9d00v4349cdqgd13f00000gn/T/tmptsi_mco3.hex --gas 30000000 --input 30627b7c",
-      "mean": 0.02441227736,
-      "stddev": 0.0005868325391050574,
-      "median": 0.024381856460000004,
-      "user": 0.02211684,
-      "system": 0.00432304,
-      "min": 0.02326639796,
-      "max": 0.02562593996,
+      "command": "/Users/williamcory/bench/evms/Guillotine/apps/cli/guillotine-bench run --codefile /var/folders/4s/d0wlfs9d00v4349cdqgd13f00000gn/T/tmp2y49swdk.hex --gas 30000000 --input 30627b7c",
+      "mean": 0.011553246960000001,
+      "stddev": null,
+      "median": 0.011553246960000001,
+      "user": 0.009030139999999999,
+      "system": 0.0021356599999999997,
+      "min": 0.011553246960000001,
+      "max": 0.011553246960000001,
       "times": [
-        0.02459135696,
-        0.02326639796,
-        0.02403689896,
-        0.02458089796,
-        0.024370856960000003,
-        0.02468902296,
-        0.02429964796,
-        0.02426889796,
-        0.02562593996,
-        0.02439285596
+        0.011553246960000001
       ],
       "exit_codes": [
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
         0
       ]
     }
