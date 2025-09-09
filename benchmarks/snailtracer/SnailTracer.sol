@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0
 // This contract is a slightly modified version of Péter Szilágyi's snailtracer.sol, licensed under GPL-3.0
 // https://github.com/karalabe/snailtracer
-pragma solidity ^0.4.26;
+// Updated for Solidity 0.8.20 compatibility
+pragma solidity ^0.8.20;
 
 contract SnailTracer {
   // Image properties for the path tracer
@@ -19,42 +20,46 @@ contract SnailTracer {
   // TracePixel traces a single pixel of the configured image and returns the RGB
   // values to the caller. This method is meant to be used specifically for high
   // SPP renderings which would have a huge overhead otherwise.
-  function TracePixel(int x, int y, int spp) public constant returns (byte r, byte g, byte b) {
+  function TracePixel(int x, int y, int spp) public returns (bytes1 r, bytes1 g, bytes1 b) {
     Vector memory color = trace(x, y, spp);
-    return (byte(color.x), byte(color.y), byte(color.z));
+    return (bytes1(uint8(uint256(int256(color.x)))), bytes1(uint8(uint256(int256(color.y)))), bytes1(uint8(uint256(int256(color.z)))));
   }
   // TraceScanline traces a single horizontal scanline of the configured image and
   // returns the RGB pixel value array. This method should be used for lower SPP
   // rendering to void the overhead of by-pixel EVM calls.
-  function TraceScanline(int y, int spp) public constant returns (bytes) {
+  function TraceScanline(int y, int spp) public returns (bytes memory) {
+    bytes memory localBuffer = new bytes(uint256(int256(width * 3)));
+    uint256 idx = 0;
     for (int x = 0; x < width; x++) {
       Vector memory color = trace(x, y, spp);
 
-      buffer.push(byte(color.x));
-      buffer.push(byte(color.y));
-      buffer.push(byte(color.z));
+      localBuffer[idx++] = bytes1(uint8(uint256(int256(color.x))));
+      localBuffer[idx++] = bytes1(uint8(uint256(int256(color.y))));
+      localBuffer[idx++] = bytes1(uint8(uint256(int256(color.z))));
     }
-    return buffer;
+    return localBuffer;
   }
   // TraceImage traces the entire image of the sconfigured scene and returns the
   // RGB pixel value array containing all the data top-down, left-to-right. This
   // method should only be callsed for very small images and SPP values as the
   // cumulative gas and memory costs can push the EVM too hard.
-  function TraceImage(int spp) public constant returns (bytes) {
+  function TraceImage(int spp) public returns (bytes memory) {
+    bytes memory localBuffer = new bytes(uint256(int256(width * height * 3)));
+    uint256 idx = 0;
     for (int y = height - 1; y >= 0; y--) {
       for (int x = 0; x < width; x++) {
         Vector memory color = trace(x, y, spp);
 
-        buffer.push(byte(color.x));
-        buffer.push(byte(color.y));
-        buffer.push(byte(color.z));
+        localBuffer[idx++] = bytes1(uint8(uint256(int256(color.x))));
+        localBuffer[idx++] = bytes1(uint8(uint256(int256(color.y))));
+        localBuffer[idx++] = bytes1(uint8(uint256(int256(color.z))));
       }
     }
-    return buffer;
+    return localBuffer;
   }
   // Benchmark sets up an ephemeral image configuration and traces a select few
   // hand picked pixels to measure EVM execution performance.
-  function Benchmark() public constant returns (byte r, byte g, byte b) {
+  function Benchmark() public returns (bytes1 r, bytes1 g, bytes1 b) {
     // Configure the scene for benchmarking
     width = 1024; height = 768;
 
@@ -62,6 +67,10 @@ contract SnailTracer {
     camera = Ray(Vector(50000000, 52000000, 295600000), norm(Vector(0, -42612, -1000000)), 0, false);
     deltaX = Vector(width * 513500 / height, 0, 0);
     deltaY = div(mul(norm(cross(deltaX, camera.direction)), 513500), 1000000);
+
+    // Clear spheres array if needed
+    delete spheres;
+    delete triangles;
 
     // Initialize the scene bounding boxes
     spheres.push(Sphere(100000000000, Vector(100001000000, 40800000, 81600000), Vector(0, 0, 0), Vector(750000, 250000, 250000), Material.Diffuse));
@@ -112,36 +121,39 @@ contract SnailTracer {
     color = add(color, trace(522, 524, 8)); // Reflective surface mirroring the refractive surface reflecting the light
     color = div(color, 4);
 
-    return (byte(color.x), byte(color.y), byte(color.z));
+    return (bytes1(uint8(uint256(int256(color.x)))), bytes1(uint8(uint256(int256(color.y)))), bytes1(uint8(uint256(int256(color.z)))));
   }
+
+  // Trivial linear congruential pseudo-random number generator
+  uint32 seed;
+
   // trace executes the path tracing for a single pixel of the result image and
   // returns the RGB color vector normalized to [0, 256) value range.
-  function trace(int x, int y, int spp) internal returns (Vector color) {
-    seed = uint32(y * width + x); // Deterministic image irrelevant of render chunks
+  function trace(int x, int y, int spp) internal returns (Vector memory color) {
+    seed = uint32(uint256(int256(y * width + x))); // Deterministic image irrelevant of render chunks
 
     color = Vector(0, 0, 0);
     for (int k=0; k<spp; k++) {
-      Vector memory pixel = add(div(add(mul(deltaX, (1000000*x + rand()%500000)/width - 500000), mul(deltaY, (1000000*y + rand()%500000)/height - 500000)), 1000000), camera.direction);
+      Vector memory pixel = add(div(add(mul(deltaX, (1000000*x + int256(uint256(rand()%500000)))/width - 500000), mul(deltaY, (1000000*y + int256(uint256(rand()%500000)))/height - 500000)), 1000000), camera.direction);
       Ray    memory ray   = Ray(add(camera.origin, mul(pixel, 140)), norm(pixel), 0, false);
 
       color = add(color, div(radiance(ray), spp));
     }
     return div(mul(clamp(color), 255), 1000000);
   }
-  // Trivial linear congruential pseudo-random number generator
-  uint32 seed;
+  
   function rand() internal returns (uint32) {
     seed = 1103515245 * seed + 12345;
     return seed;
   }
   // Clamp bounds an int value to the allowed [0, 1] range.
-  function clamp(int x) internal returns (int) {
+  function clamp(int x) internal pure returns (int) {
     if (x < 0) { return 0; }
     if (x > 1000000) { return 1000000; }
     return x;
   }
   // Square root calculation based on the Babylonian method
-  function sqrt(int x) internal returns (int y) {
+  function sqrt(int x) internal pure returns (int y) {
     int z = (x + 1) / 2;
     y = x;
     while (z < y) {
@@ -150,7 +162,7 @@ contract SnailTracer {
     }
   }
   // Sine calculation based on Taylor series expansion.
-  function sin(int x) internal returns (int y) {
+  function sin(int x) internal pure returns (int y) {
     // Ensure x is between [0, 2PI) (Taylor expansion is picky with large numbers)
     while (x < 0) {
       x += 6283184;
@@ -169,11 +181,11 @@ contract SnailTracer {
     }
   }
   // Cosine calculation based on sine and Pythagorean identity.
-  function cos(int x) internal returns (int) {
+  function cos(int x) internal pure returns (int) {
     int s = sin(x); return sqrt(1000000000000 - s*s);
   }
   // Abs returns the absolute value of x.
-  function abs(int x) internal returns (int) {
+  function abs(int x) internal pure returns (int) {
     if (x > 0) {
       return x;
     }
@@ -184,32 +196,32 @@ contract SnailTracer {
     int x; int y; int z;
   }
 
-  function add(Vector u, Vector v) internal returns (Vector) {
+  function add(Vector memory u, Vector memory v) internal pure returns (Vector memory) {
     return Vector(u.x+v.x, u.y+v.y, u.z+v.z);
   }
-  function sub(Vector u, Vector v) internal returns (Vector) {
+  function sub(Vector memory u, Vector memory v) internal pure returns (Vector memory) {
     return Vector(u.x-v.x, u.y-v.y, u.z-v.z);
   }
-  function mul(Vector v, int m) internal returns (Vector) {
+  function mul(Vector memory v, int m) internal pure returns (Vector memory) {
     return Vector(m*v.x, m*v.y, m*v.z);
   }
-  function mul(Vector u, Vector v) internal returns (Vector) {
+  function mul(Vector memory u, Vector memory v) internal pure returns (Vector memory) {
     return Vector(u.x*v.x, u.y*v.y, u.z*v.z);
   }
-  function div(Vector v, int d) internal returns (Vector) {
+  function div(Vector memory v, int d) internal pure returns (Vector memory) {
     return Vector(v.x/d, v.y/d, v.z/d);
   }
-  function dot(Vector u, Vector v) internal returns (int) {
+  function dot(Vector memory u, Vector memory v) internal pure returns (int) {
     return u.x*v.x + u.y*v.y + u.z*v.z;
   }
-  function cross(Vector u, Vector v) internal returns (Vector) {
+  function cross(Vector memory u, Vector memory v) internal pure returns (Vector memory) {
     return Vector(u.y*v.z - u.z*v.y, u.z*v.x - u.x*v.z, u.x*v.y - u.y*v.x);
   }
-  function norm(Vector v) internal returns (Vector) {
+  function norm(Vector memory v) internal pure returns (Vector memory) {
     int length = sqrt(v.x*v.x + v.y*v.y + v.z*v.z);
     return Vector(v.x * 1000000 / length, v.y * 1000000 / length, v.z * 1000000 / length);
   }
-  function clamp(Vector v) internal returns (Vector) {
+  function clamp(Vector memory v) internal pure returns (Vector memory) {
     return Vector(clamp(v.x), clamp(v.y), clamp(v.z));
   }
   // Ray is a parametric line with an origin and a direction.
@@ -247,7 +259,7 @@ contract SnailTracer {
 
   // intersect calculates the intersection of a ray with a sphere, returning the
   // distance till the first intersection point or zero in case of no intersection.
-  function intersect(Sphere s, Ray r) internal returns (int) {
+  function intersect(Sphere memory s, Ray memory r) internal pure returns (int) {
     Vector memory op = sub(s.position, r.origin);
 
     int b   = dot(op, r.direction) / 1000000;
@@ -267,7 +279,7 @@ contract SnailTracer {
     }
     return 0;
   }
-  function intersect(Triangle t, Ray r) internal returns (int) {
+  function intersect(Triangle memory t, Ray memory r) internal pure returns (int) {
     Vector memory e1 = sub(t.b, t.a);
     Vector memory e2 = sub(t.c, t.a);
 
@@ -299,13 +311,13 @@ contract SnailTracer {
     }
     return dist;
   }
-  function radiance(Ray ray) internal returns (Vector) {
+  function radiance(Ray memory ray) internal returns (Vector memory) {
     // Place a limit on the depth to prevent stack overflows
     if (ray.depth > 10) {
       return Vector(0, 0, 0);
     }
     // Find the closest object of intersection
-    int dist; Primitive p; uint id; (dist, p, id) = traceray(ray);
+    (int dist, Primitive p, uint id) = traceray(ray);
     if (dist == 0) {
       return Vector(0, 0, 0);
     }
@@ -336,7 +348,7 @@ contract SnailTracer {
     }
     ray.depth++;
     if (ray.depth > 5) {
-      if (rand() % 1000000 < ref) {
+      if (int256(uint256(rand() % 1000000)) < ref) {
         color = div(mul(color, 1000000), ref);
       } else {
         return emission;
@@ -351,25 +363,25 @@ contract SnailTracer {
     }
     return add(emission, div(mul(color, result), 1000000));
   }
-  function radiance(Ray ray, Sphere obj, int dist) internal returns (Vector) {
+  function radiance(Ray memory ray, Sphere memory obj, int dist) internal returns (Vector memory) {
     // Calculate the sphere intersection point and normal vectors for recursion
-    Vector memory intersect = add(ray.origin, div(mul(ray.direction, dist), 1000000));
-    Vector memory normal    = norm(sub(intersect, obj.position));
+    Vector memory intersectPoint = add(ray.origin, div(mul(ray.direction, dist), 1000000));
+    Vector memory normal    = norm(sub(intersectPoint, obj.position));
 
     // For diffuse reflectivity
     if (obj.reflection == Material.Diffuse) {
       if (dot(normal, ray.direction) >= 0) {
         normal = mul(normal, -1);
       }
-      return diffuse(ray, intersect, normal);
+      return diffuse(ray, intersectPoint, normal);
     } else { // For specular reflectivity
-      return specular(ray, intersect, normal);
+      return specular(ray, intersectPoint, normal);
     }
   }
-  function radiance(Ray ray, Triangle obj, int dist) internal returns (Vector) {
+  function radiance(Ray memory ray, Triangle memory obj, int dist) internal returns (Vector memory) {
     // Calculate the triangle intersection point for refraction
     // We're cheating here, we don't have diffuse triangles :P
-    Vector memory intersect = add(ray.origin, div(mul(ray.direction, dist), 1000000));
+    Vector memory intersectPoint = add(ray.origin, div(mul(ray.direction, dist), 1000000));
 
     // Calculate the refractive indices based on whether we're in or out
     int nnt = 666666; // (1 air / 1.5 glass)
@@ -383,14 +395,14 @@ contract SnailTracer {
     // If the angle is too shallow, all light is reflected
     int cos2t = 1000000000000 - nnt * nnt * (1000000000000 - ddn * ddn) / 1000000000000;
     if (cos2t < 0) {
-      return specular(ray, intersect, obj.normal);
+      return specular(ray, intersectPoint, obj.normal);
     }
-    return refractive(ray, intersect, obj.normal, nnt, ddn, cos2t);
+    return refractive(ray, intersectPoint, obj.normal, nnt, ddn, cos2t);
   }
-  function diffuse(Ray ray, Vector intersect, Vector normal) internal returns (Vector) {
+  function diffuse(Ray memory ray, Vector memory intersectPoint, Vector memory normal) internal returns (Vector memory) {
     // Generate a random angle and distance from center
-    int r1 = int(6283184) * (rand() % 1000000) / 1000000;
-    int r2 = rand() % 1000000; int r2s = sqrt(r2) * 1000;
+    int r1 = int(6283184) * int256(uint256(rand() % 1000000)) / 1000000;
+    int r2 = int256(uint256(rand() % 1000000)); int r2s = sqrt(r2) * 1000;
 
     // Create orthonormal coordinate frame
     Vector memory u;
@@ -404,13 +416,13 @@ contract SnailTracer {
 
     // Generate the random reflection ray and continue path tracing
     u = norm(add(add(mul(u, cos(r1) * r2s / 1000000), mul(v, sin(r1) * r2s / 1000000)), mul(normal, sqrt(1000000 - r2) * 1000)));
-    return radiance(Ray(intersect, u, ray.depth, ray.refract));
+    return radiance(Ray(intersectPoint, u, ray.depth, ray.refract));
   }
-  function specular(Ray ray, Vector intersect, Vector normal) internal returns (Vector) {
+  function specular(Ray memory ray, Vector memory intersectPoint, Vector memory normal) internal returns (Vector memory) {
     Vector memory reflection = norm(sub(ray.direction, mul(normal, 2 * dot(normal, ray.direction) / 1000000)));
-    return radiance(Ray(intersect, reflection, ray.depth, ray.refract));
+    return radiance(Ray(intersectPoint, reflection, ray.depth, ray.refract));
   }
-  function refractive(Ray ray, Vector intersect, Vector normal, int nnt, int ddn, int cos2t) internal returns (Vector) {
+  function refractive(Ray memory ray, Vector memory intersectPoint, Vector memory normal, int nnt, int ddn, int cos2t) internal returns (Vector memory) {
     // Calculate the refraction rays for fresnel effects
     int sign = -1; if (ray.refract) { sign = 1; }
     Vector memory refraction = norm(div(sub(mul(ray.direction, nnt), mul(normal, sign * (ddn * nnt / 1000000 + sqrt(cos2t)))), 1000000));
@@ -424,18 +436,18 @@ contract SnailTracer {
 
     // Split a direct hit, otherwise trace only one ray
     if (ray.depth <= 2) {
-      refraction = mul(radiance(Ray(intersect, refraction, ray.depth, !ray.refract)), 1000000 - re); // Reuse refraction variable (lame)
-      refraction = add(refraction, mul(specular(ray, intersect, normal), re));
+      refraction = mul(radiance(Ray(intersectPoint, refraction, ray.depth, !ray.refract)), 1000000 - re); // Reuse refraction variable (lame)
+      refraction = add(refraction, mul(specular(ray, intersectPoint, normal), re));
       return div(refraction, 1000000);
     }
-    if (rand() % 1000000 < 250000 + re / 2) {
-      return div(mul(specular(ray, intersect, normal), re), 250000 + re / 2);
+    if (int256(uint256(rand() % 1000000)) < 250000 + re / 2) {
+      return div(mul(specular(ray, intersectPoint, normal), re), 250000 + re / 2);
     }
-    return div(mul(radiance(Ray(intersect, refraction, ray.depth, !ray.refract)), 1000000 - re), 750000 - re / 2);
+    return div(mul(radiance(Ray(intersectPoint, refraction, ray.depth, !ray.refract)), 1000000 - re), 750000 - re / 2);
   }
-  // traceray calculates the intersection of a ray with all the objects and
+  // traceray calculates the intersection of all the objects and
   // returns the closest one.
-  function traceray(Ray ray) internal returns (int, Primitive, uint) {
+  function traceray(Ray memory ray) internal view returns (int, Primitive, uint) {
     int dist = 0; Primitive p; uint id;
 
     // Intersect the ray with all the spheres
@@ -446,10 +458,10 @@ contract SnailTracer {
       }
     }
     // Intersect the ray with all the triangles
-    for (i=0; i<triangles.length; i++) {
-      d = intersect(triangles[i], ray);
+    for (uint j=0; j<triangles.length; j++) {
+      int d = intersect(triangles[j], ray);
       if (d > 0 && (dist == 0 || d < dist)) {
-        dist = d; p = Primitive.Triangle; id = i;
+        dist = d; p = Primitive.Triangle; id = j;
       }
     }
     return (dist, p, id);
