@@ -104,8 +104,8 @@ def get_evm_benchmarks() -> Dict[str, Dict[str, Any]]:
             "requires": []
         }
     
-    # Snailtracer benchmark - read the pre-compiled bytecode
-    snailtracer_path = Path("benchmarks/snailtracer/snailtracer_bytecode.hex")
+    # Snailtracer benchmark - read the pre-compiled runtime bytecode
+    snailtracer_path = Path("benchmarks/snailtracer/snailtracer_runtime.hex")
     if snailtracer_path.exists():
         try:
             with open(snailtracer_path, "r") as f:
