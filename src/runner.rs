@@ -28,10 +28,14 @@ struct HyperfineResult {
 struct HyperfineRun {
     mean: f64,
     #[serde(default)]
-    stddev: f64,
-    median: f64,
-    min: f64,
-    max: f64,
+    stddev: Option<f64>,
+    #[serde(default)]
+    median: Option<f64>,
+    #[serde(default)]
+    min: Option<f64>,
+    #[serde(default)]
+    max: Option<f64>,
+    #[serde(default)]
     times: Vec<f64>,
 }
 
@@ -39,6 +43,7 @@ pub fn run_benchmarks(
     benchmark_name: Option<String>,
     iterations: usize,
     warmup: usize,
+    internal_runs: usize,
     evm: Option<String>,
     evms: Option<String>,
     all: bool,
@@ -87,6 +92,7 @@ pub fn run_benchmarks(
                 &benchmark,
                 iterations,
                 warmup,
+                internal_runs,
                 verbose,
             )?;
             
@@ -146,6 +152,7 @@ fn run_single_benchmark(
     benchmark: &Benchmark,
     iterations: usize,
     warmup: usize,
+    internal_runs: usize,
     verbose: bool,
 ) -> Result<BenchmarkResult> {
     // Get path to our own executable
@@ -154,12 +161,13 @@ fn run_single_benchmark(
     
     // Build the command that hyperfine will run
     let bench_cmd = format!(
-        "{} execute --evm {} --bytecode {} --calldata {} --gas {}",
+        "{} execute --evm {} --bytecode {} --calldata {} --gas {} --internal-runs {}",
         exe_path.display(),
         evm_name,
         benchmark.bytecode,
         benchmark.calldata,
         benchmark.gas,
+        internal_runs,
     );
     
     // Create temp file for hyperfine JSON output
@@ -205,10 +213,10 @@ fn run_single_benchmark(
         name: benchmark.name.clone(),
         evm: evm_name.to_string(),
         mean: run.mean,
-        stddev: run.stddev,
-        median: run.median,
-        min: run.min,
-        max: run.max,
+        stddev: run.stddev.unwrap_or(0.0),
+        median: run.median.unwrap_or(run.mean),
+        min: run.min.unwrap_or(run.mean),
+        max: run.max.unwrap_or(run.mean),
         times: run.times,
     })
 }
@@ -223,6 +231,7 @@ pub fn compare_evms(
         benchmark,
         10,  // iterations
         3,   // warmup
+        10,  // internal_runs
         None,
         Some(evms.join(",")),
         false,
