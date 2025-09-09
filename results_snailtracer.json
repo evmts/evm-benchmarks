@@ -1,20 +1,20 @@
 {
   "results": [
     {
-      "command": "/Users/williamcory/bench/evms/revm/target/release/revme evm --path /var/folders/4s/d0wlfs9d00v4349cdqgd13f00000gn/T/bytecode-3145685041.hex --gas-limit 1000000000 --input 30627b7c",
-      "mean": 0.03424663086,
-      "stddev": 0.0005676174047329782,
-      "median": 0.03424877246000001,
-      "user": 0.0314362,
-      "system": 0.0019900799999999995,
-      "min": 0.033566563460000004,
-      "max": 0.034974981460000006,
+      "command": "/Users/williamcory/bench/evms/revm/target/release/revme evm --path /var/folders/4s/d0wlfs9d00v4349cdqgd13f00000gn/T/bytecode-1126803454.hex --gas-limit 1000000000 --input 30627b7c",
+      "mean": 0.034803181819999994,
+      "stddev": 0.0002785426412449257,
+      "median": 0.03483003202,
+      "user": 0.03150421999999999,
+      "system": 0.0019627,
+      "min": 0.03438490702,
+      "max": 0.03516099002,
       "times": [
-        0.033566563460000004,
-        0.03383768946,
-        0.03424877246000001,
-        0.034974981460000006,
-        0.034605147460000006
+        0.03476486502,
+        0.03487511502,
+        0.03516099002,
+        0.03438490702,
+        0.03483003202
       ],
       "exit_codes": [
         0,
