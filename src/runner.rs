@@ -127,7 +127,7 @@ fn determine_evms(
         }
         
         // Check for guillotine
-        if std::path::Path::new("evms/guillotine-go-sdk/apps/cli/guillotine-bench").exists() {
+        if std::path::Path::new("evms/guillotine/apps/cli/guillotine-bench").exists() {
             available.push("guillotine".to_string());
         }
         
