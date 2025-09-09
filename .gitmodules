@@ -1,6 +1,3 @@
 [submodule "evms/guillotine"]
 	path = evms/guillotine
 	url = https://github.com/evmts/Guillotine.git
-[submodule "evms/revm"]
-	path = evms/revm
-	url = https://github.com/bluealloy/revm.git
