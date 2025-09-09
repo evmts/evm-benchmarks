@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 authors = ["EVM Bench Contributors"]
 description = "EVM benchmarking tool for comparing different implementations"
+default-run = "evm-bench"
 
 [[bin]]
 name = "evm-bench"
