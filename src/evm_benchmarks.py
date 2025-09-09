@@ -148,8 +148,8 @@ def find_guillotine_binary() -> Optional[str]:
     if guillotine_bench.exists():
         return str(guillotine_bench.absolute())
     
-    # Check in evms/Guillotine as well
-    built_guillotine = Path("evms/Guillotine/apps/cli/guillotine-bench")
+    # Check in evms/guillotine-go-sdk as well
+    built_guillotine = Path("evms/guillotine-go-sdk/apps/cli/guillotine-bench")
     if built_guillotine.exists():
         return str(built_guillotine.absolute())
     
