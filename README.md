@@ -11,8 +11,8 @@ Latest benchmark results comparing Guillotine and Revm EVMs (10 iterations):
 
 | EVM | Mean (s) | Std Dev | Min (s) | Max (s) | Median (s) |
 |-----|----------|---------|---------|---------|------------|
-| ⚡ guillotine | 0.0475 | 0.0011 | 0.0463 | 0.0502 | 0.0474 |
-| revm | 0.0526 | 0.0004 | 0.0518 | 0.0531 | 0.0528 |
+| ⚡ guillotine | 0.0472 | 0.0005 | 0.0465 | 0.0478 | 0.0472 |
+| revm | 0.0530 | 0.0006 | 0.0522 | 0.0538 | 0.0530 |
 
 **Performance**: guillotine is 1.11x faster than revm
 
@@ -21,8 +21,8 @@ Latest benchmark results comparing Guillotine and Revm EVMs (10 iterations):
 
 | EVM | Mean (s) | Std Dev | Min (s) | Max (s) | Median (s) |
 |-----|----------|---------|---------|---------|------------|
-| ⚡ guillotine | 0.0532 | 0.0010 | 0.0519 | 0.0557 | 0.0531 |
-| revm | 0.0763 | 0.0008 | 0.0752 | 0.0780 | 0.0762 |
+| ⚡ guillotine | 0.0539 | 0.0006 | 0.0531 | 0.0551 | 0.0537 |
+| revm | 0.0773 | 0.0012 | 0.0757 | 0.0790 | 0.0773 |
 
 **Performance**: guillotine is 1.43x faster than revm
 
@@ -31,18 +31,18 @@ Latest benchmark results comparing Guillotine and Revm EVMs (10 iterations):
 
 | EVM | Mean (s) | Std Dev | Min (s) | Max (s) | Median (s) |
 |-----|----------|---------|---------|---------|------------|
-| ⚡ guillotine | 0.0599 | 0.0006 | 0.0592 | 0.0611 | 0.0598 |
-| revm | 0.0648 | 0.0007 | 0.0640 | 0.0658 | 0.0648 |
+| ⚡ guillotine | 0.0608 | 0.0007 | 0.0599 | 0.0619 | 0.0607 |
+| revm | 0.0650 | 0.0006 | 0.0643 | 0.0662 | 0.0649 |
 
-**Performance**: guillotine is 1.08x faster than revm
+**Performance**: guillotine is 1.07x faster than revm
 
 ### erc20_mint_bench
 *Benchmark ERC20 minting operations*
 
 | EVM | Mean (s) | Std Dev | Min (s) | Max (s) | Median (s) |
 |-----|----------|---------|---------|---------|------------|
-| ⚡ guillotine | 0.0395 | 0.0007 | 0.0387 | 0.0410 | 0.0393 |
-| revm | 0.0418 | 0.0013 | 0.0410 | 0.0454 | 0.0416 |
+| ⚡ guillotine | 0.0399 | 0.0005 | 0.0392 | 0.0407 | 0.0398 |
+| revm | 0.0424 | 0.0006 | 0.0415 | 0.0432 | 0.0425 |
 
 **Performance**: guillotine is 1.06x faster than revm
 
@@ -51,10 +51,10 @@ Latest benchmark results comparing Guillotine and Revm EVMs (10 iterations):
 
 | EVM | Mean (s) | Std Dev | Min (s) | Max (s) | Median (s) |
 |-----|----------|---------|---------|---------|------------|
-| ⚡ guillotine | 0.2328 | 0.0012 | 0.2310 | 0.2349 | 0.2328 |
-| revm | 0.2844 | 0.0018 | 0.2817 | 0.2872 | 0.2844 |
+| ⚡ guillotine | 0.2318 | 0.0010 | 0.2304 | 0.2334 | 0.2316 |
+| revm | 0.2847 | 0.0019 | 0.2813 | 0.2882 | 0.2848 |
 
-**Performance**: guillotine is 1.22x faster than revm
+**Performance**: guillotine is 1.23x faster than revm
 
 ## Features
 
