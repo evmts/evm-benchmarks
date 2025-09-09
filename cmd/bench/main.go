@@ -44,6 +44,7 @@ func runCommand() *cli.Command {
 	return &cli.Command{
 		Name:  "run",
 		Usage: "Run benchmarks",
+		UseShortOptionHandling: true,
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:    "verbose",
@@ -97,6 +98,9 @@ func runCommand() *cli.Command {
 			},
 		},
 		ArgsUsage: "[benchmark]",
+		Description: "Note: Flags must be placed BEFORE the benchmark name.\n" +
+			"Example: bench run --evms guillotine ten_thousand_hashes\n" +
+			"NOT: bench run ten_thousand_hashes --evms guillotine",
 		Action:    runAction,
 	}
 }
@@ -114,23 +118,19 @@ func runAction(c *cli.Context) error {
 		return fmt.Errorf("no benchmarks available")
 	}
 
-	// Filter by specific benchmark if provided
-	benchmarkName := c.Args().First()
-	if benchmarkName != "" {
-		if b, ok := benchmarks[benchmarkName]; ok {
-			benchmarks = map[string]*benchmark.Benchmark{
-				benchmarkName: b,
-			}
-		} else {
-			return fmt.Errorf("unknown benchmark: %s", benchmarkName)
-		}
-	}
-
-	// Determine which EVMs to run
+	// Determine which EVMs to run FIRST (before filtering benchmarks)
 	var evmsToRun []benchmark.EVMType
+	verbose := c.Bool("verbose")
+	
 	if c.Bool("all") {
 		evmsToRun = benchmark.GetAvailableEVMs()
+		if verbose {
+			fmt.Println("DEBUG: Running on all available EVMs")
+		}
 	} else if evmsList := c.String("evms"); evmsList != "" {
+		if verbose {
+			fmt.Printf("DEBUG: evms flag value: '%s'\n", evmsList)
+		}
 		for _, evm := range strings.Split(evmsList, ",") {
 			switch strings.TrimSpace(evm) {
 			case "geth":
@@ -144,6 +144,9 @@ func runAction(c *cli.Context) error {
 			}
 		}
 	} else if evm := c.String("evm"); evm != "" {
+		if verbose {
+			fmt.Printf("DEBUG: evm flag value: '%s'\n", evm)
+		}
 		switch evm {
 		case "geth":
 			evmsToRun = []benchmark.EVMType{benchmark.EVMGeth}
@@ -156,7 +159,25 @@ func runAction(c *cli.Context) error {
 		}
 	} else {
 		// Default to geth
+		if verbose {
+			fmt.Println("DEBUG: No EVM specified, defaulting to geth")
+		}
 		evmsToRun = []benchmark.EVMType{benchmark.EVMGeth}
+	}
+
+	// Filter by specific benchmark if provided (AFTER determining EVMs)
+	benchmarkName := c.Args().First()
+	if benchmarkName != "" {
+		if b, ok := benchmarks[benchmarkName]; ok {
+			benchmarks = map[string]*benchmark.Benchmark{
+				benchmarkName: b,
+			}
+			if verbose {
+				fmt.Printf("DEBUG: Running only benchmark '%s'\n", benchmarkName)
+			}
+		} else {
+			return fmt.Errorf("unknown benchmark: %s", benchmarkName)
+		}
 	}
 
 	if len(evmsToRun) == 0 {
@@ -165,7 +186,6 @@ func runAction(c *cli.Context) error {
 
 	iterations := c.Int("iterations")
 	useTUI := !c.Bool("no-tui")
-	verbose := c.Bool("verbose")
 	output := c.String("output")
 
 	// Run matrix if multiple EVMs
@@ -194,7 +214,7 @@ func runAction(c *cli.Context) error {
 }
 
 func runDirectBenchmark(benchmarks map[string]*benchmark.Benchmark, evmType benchmark.EVMType, iterations int, verbose bool, output string) error {
-	fmt.Printf("Running %d benchmark(s) on %s\n\n", len(benchmarks), evmType)
+	fmt.Printf("Running %d benchmark(s) on %s\n\n", len(benchmarks), string(evmType))
 
 	results := make(map[string]*benchmark.BenchmarkResult)
 

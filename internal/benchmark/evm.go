@@ -229,17 +229,17 @@ func FindGethBinary() (string, error) {
 
 // FindGuillotineBinary finds the Guillotine binary path
 func FindGuillotineBinary() (string, error) {
-	// Check for guillotine-bench in apps/cli
-	guillotineBench := filepath.Join("apps", "cli", "guillotine-bench")
-	if _, err := os.Stat(guillotineBench); err == nil {
-		abs, _ := filepath.Abs(guillotineBench)
-		return abs, nil
-	}
-	
-	// Check in evms/guillotine-go-sdk
+	// Check in evms/guillotine-go-sdk first (primary location)
 	builtGuillotine := filepath.Join("evms", "guillotine-go-sdk", "apps", "cli", "guillotine-bench")
 	if _, err := os.Stat(builtGuillotine); err == nil {
 		abs, _ := filepath.Abs(builtGuillotine)
+		return abs, nil
+	}
+	
+	// Check for guillotine-bench in apps/cli (fallback)
+	guillotineBench := filepath.Join("apps", "cli", "guillotine-bench")
+	if _, err := os.Stat(guillotineBench); err == nil {
+		abs, _ := filepath.Abs(guillotineBench)
 		return abs, nil
 	}
 	

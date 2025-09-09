@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
@@ -164,9 +165,15 @@ func runGuillotineBenchmark(bench *Benchmark, iterations int, useHyperfine bool,
 			guillotineCmd = append(guillotineCmd, "--input", bench.Calldata)
 		}
 		
-		// Set environment to suppress debug output
+		// Set environment to suppress debug output and add library path
 		env := os.Environ()
-		env = append(env, "GUILLOTINE_LOG_LEVEL=error", "ZIG_LOG_LEVEL=error")
+		// Add the library path for Guillotine FFI
+		libPath := filepath.Join("evms", "guillotine-go-sdk", "zig-out", "lib")
+		absLibPath, _ := filepath.Abs(libPath)
+		env = append(env, 
+			"GUILLOTINE_LOG_LEVEL=error", 
+			"ZIG_LOG_LEVEL=error",
+			"DYLD_LIBRARY_PATH=" + absLibPath + ":" + os.Getenv("DYLD_LIBRARY_PATH"))
 		
 		resultsFile := fmt.Sprintf("results_%s.json", bench.Name)
 		hyperfineCmd := []string{
@@ -219,7 +226,13 @@ func runGuillotineBenchmark(bench *Benchmark, iterations int, useHyperfine bool,
 	
 	// Direct execution without hyperfine
 	env := os.Environ()
-	env = append(env, "GUILLOTINE_LOG_LEVEL=error", "ZIG_LOG_LEVEL=error")
+	// Add the library path for Guillotine FFI
+	libPath := filepath.Join("evms", "guillotine-go-sdk", "zig-out", "lib")
+	absLibPath, _ := filepath.Abs(libPath)
+	env = append(env, 
+		"GUILLOTINE_LOG_LEVEL=error", 
+		"ZIG_LOG_LEVEL=error",
+		"DYLD_LIBRARY_PATH=" + absLibPath + ":" + os.Getenv("DYLD_LIBRARY_PATH"))
 	
 	cmd := exec.Command(guillotineBinary, "run",
 		"--codefile", tempFile.Name(),

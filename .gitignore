@@ -50,8 +50,8 @@ coverage.xml
 venv/
 
 # Go binaries
-bench
-bench-go
+/bench
+/bench-go
 *.exe
 ENV/
 env/
