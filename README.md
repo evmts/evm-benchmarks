@@ -2,6 +2,60 @@
 
 A high-performance benchmarking framework for comparing Ethereum Virtual Machine (EVM) implementations, built with Rust and Clap.
 
+## Benchmark Results
+
+Latest benchmark results comparing Guillotine and Revm EVMs (3 iterations):
+
+### erc20_approval_bench
+*Benchmark ERC20 approval and transfer operations*
+
+| EVM | Mean (s) | Std Dev | Min (s) | Max (s) | Median (s) |
+|-----|----------|---------|---------|---------|------------|
+| ⚡ guillotine | 0.0066 | 0.0001 | 0.0065 | 0.0068 | 0.0066 |
+| revm | 0.0073 | 0.0001 | 0.0072 | 0.0075 | 0.0073 |
+
+**Performance**: guillotine is 1.10x faster than revm
+
+### snailtracer
+*Ray tracing benchmark (compute intensive, 1B gas)*
+
+| EVM | Mean (s) | Std Dev | Min (s) | Max (s) | Median (s) |
+|-----|----------|---------|---------|---------|------------|
+| ⚡ guillotine | 0.7329 | 0.0086 | 0.7262 | 0.7426 | 0.7298 |
+| revm | 1.0248 | 0.0041 | 1.0207 | 1.0289 | 1.0248 |
+
+**Performance**: guillotine is 1.40x faster than revm
+
+### ten_thousand_hashes
+*Execute 10,000 keccak256 hash operations*
+
+| EVM | Mean (s) | Std Dev | Min (s) | Max (s) | Median (s) |
+|-----|----------|---------|---------|---------|------------|
+| ⚡ guillotine | 0.0054 | 0.0001 | 0.0053 | 0.0055 | 0.0054 |
+| revm | 0.0076 | 0.0001 | 0.0075 | 0.0078 | 0.0076 |
+
+**Performance**: guillotine is 1.41x faster than revm
+
+### erc20_transfer_bench
+*Benchmark ERC20 transfer operations*
+
+| EVM | Mean (s) | Std Dev | Min (s) | Max (s) | Median (s) |
+|-----|----------|---------|---------|---------|------------|
+| ⚡ guillotine | 0.0079 | 0.0001 | 0.0077 | 0.0080 | 0.0079 |
+| revm | 0.0116 | 0.0001 | 0.0115 | 0.0117 | 0.0115 |
+
+**Performance**: guillotine is 1.47x faster than revm
+
+### erc20_mint_bench
+*Benchmark ERC20 minting operations*
+
+| EVM | Mean (s) | Std Dev | Min (s) | Max (s) | Median (s) |
+|-----|----------|---------|---------|---------|------------|
+| ⚡ guillotine | 0.0079 | 0.0001 | 0.0078 | 0.0081 | 0.0079 |
+| revm | 0.0115 | 0.0001 | 0.0114 | 0.0116 | 0.0116 |
+
+**Performance**: guillotine is 1.46x faster than revm
+
 ## Features
 
 - **Multiple EVM Support**: Compare Guillotine (Zig-based) and Revm (Rust-based) implementations
@@ -9,6 +63,31 @@ A high-performance benchmarking framework for comparing Ethereum Virtual Machine
 - **Matrix Benchmarking**: Run benchmarks across multiple EVMs simultaneously
 - **Comprehensive Test Suite**: Includes compute-intensive and token operation benchmarks
 - **JSON Export**: Detailed results with statistical analysis
+
+## Architecture
+
+### Benchmark Setup
+
+The benchmarking framework is designed to provide fair, reproducible comparisons between different EVM implementations:
+
+1. **Unified Interface**: All EVMs implement a common `EvmExecutor` trait, ensuring identical benchmark conditions
+2. **Native Integration**: EVMs are integrated at the library level for minimal overhead
+3. **Statistical Rigor**: Each benchmark runs multiple iterations with warmup rounds, using Hyperfine for statistical analysis
+4. **Transparent Compilation**: Solidity contracts are compiled on-demand using the foundry-compilers crate
+
+### EVM Integrations
+
+#### Guillotine
+- **Implementation**: High-performance Zig core with Rust SDK wrapper
+- **Integration**: Uses `guillotine-rs` crate which provides FFI bindings to the native Zig library
+- **Architecture**: The Rust SDK (`guillotine-rs`) wraps the Zig implementation, providing a safe Rust interface while maintaining the performance benefits of the Zig core
+- **Build**: Requires building the Zig library first, then linking via the Rust SDK
+
+#### Revm
+- **Implementation**: Pure Rust EVM implementation
+- **Integration**: Direct crate dependency via Cargo
+- **Architecture**: Native Rust with no FFI overhead
+- **Version**: Uses revm v14.0 for compatibility with guillotine-rs requirements
 
 ## Quick Start
 
@@ -116,13 +195,14 @@ cd apps/cli && go build -o guillotine-bench .
 ## Supported EVMs
 
 ### Guillotine
-- **Type**: Zig-based EVM with Go SDK
-- **Binary**: `evms/guillotine/apps/cli/guillotine-bench`
-- **Performance**: Optimized for speed via Zig core
+- **Type**: Zig-based EVM with Rust SDK wrapper
+- **Integration**: Via `guillotine-rs` crate (FFI bindings to Zig library)
+- **Performance**: Optimized for speed via native Zig core
+- **SDK Path**: `evms/guillotine/sdks/rust`
 
 ### Revm
-- **Type**: Rust-based EVM
-- **Binary**: Built-in support via revm crate
+- **Type**: Pure Rust EVM implementation
+- **Integration**: Direct crate dependency (revm v14.0)
 - **Performance**: Production-ready, high-performance implementation
 
 ## Output Format
