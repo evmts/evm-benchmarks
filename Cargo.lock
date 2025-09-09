@@ -1570,7 +1570,6 @@ dependencies = [
  "cc",
  "hex",
  "libc",
- "revm",
 ]
 
 [[package]]
