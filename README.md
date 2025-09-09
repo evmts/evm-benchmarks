@@ -47,7 +47,7 @@ foundryup
 cargo build --release
 
 # Build Guillotine (optional, if using Guillotine EVM)
-cd evms/guillotine-go-sdk
+cd evms/guillotine
 zig build
 cd apps/cli && go build -o guillotine-bench .
 ```
@@ -117,7 +117,7 @@ cd apps/cli && go build -o guillotine-bench .
 
 ### Guillotine
 - **Type**: Zig-based EVM with Go SDK
-- **Binary**: `evms/guillotine-go-sdk/apps/cli/guillotine-bench`
+- **Binary**: `evms/guillotine/apps/cli/guillotine-bench`
 - **Performance**: Optimized for speed via Zig core
 
 ### Revm
@@ -165,7 +165,7 @@ bench/
 ├── benchmarks/            # Benchmark contracts
 │   └── solidity/          # Solidity contracts
 ├── evms/                  # EVM submodules
-│   └── guillotine-go-sdk/ # Guillotine implementation
+│   └── guillotine/        # Guillotine implementation
 └── out/                   # Compiled contracts
 ```
 
@@ -181,7 +181,7 @@ cargo install hyperfine    # Cross-platform
 ### Guillotine not found
 ```bash
 # Build from source
-cd evms/guillotine-go-sdk
+cd evms/guillotine
 zig build
 cd apps/cli && go build -o guillotine-bench .
 ```

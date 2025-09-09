@@ -44,7 +44,7 @@ bench/
 │       ├── snailtracer.sol  # Solidity 0.4.26 implementation
 │       └── snailtracer_runtime.hex  # Compiled bytecode
 ├── evms/
-│   ├── guillotine-go-sdk/   # Guillotine EVM implementation (git submodule)
+│   ├── guillotine/          # Guillotine EVM implementation (git submodule)
 │   └── revm/                # Revm implementation (git submodule)
 └── results_*.json           # Benchmark results for each test
 ```
@@ -52,7 +52,7 @@ bench/
 ## Supported EVM Implementations
 
 ### 1. Guillotine
-- **Binary**: `evms/guillotine-go-sdk/apps/cli/guillotine-bench`
+- **Binary**: `evms/guillotine/apps/cli/guillotine-bench`
 - **Integration**: Custom Go CLI with Zig EVM core via FFI
 - **Command**: `guillotine-bench run --codefile <file> --gas <limit> --input <calldata>`
 - **Architecture**: Zig-based EVM with Go bindings, optimized for performance
@@ -163,7 +163,7 @@ All EVM implementations use the same benchmark execution flow:
 
 ### Building Guillotine (Optional)
 ```bash
-cd evms/guillotine-go-sdk
+cd evms/guillotine
 zig build
 
 # Build the benchmark CLI
@@ -240,7 +240,7 @@ Results are stored as JSON with hyperfine statistics:
 ### Common Issues
 
 1. **"guillotine-bench not found"**
-   - Build Guillotine: `cd evms/guillotine-go-sdk && zig build`
+   - Build Guillotine: `cd evms/guillotine && zig build`
    - Build CLI: `cd apps/cli && go build -o guillotine-bench .`
 
 2. **"hyperfine not installed"**
