@@ -1,14 +1,9 @@
 use anyhow::{Result, bail};
 use alloy_primitives::{Address, U256, Bytes};
 use revm::{
-    bytecode::Bytecode,
-    context::{Context, TxEnv},
-    context_interface::result::{ExecutionResult, Output},
-    database::CacheDB,
-    database_interface::EmptyDB,
-    primitives::{TxKind, keccak256},
-    state::AccountInfo,
-    ExecuteEvm, MainBuilder, MainContext,
+    db::{CacheDB, EmptyDB},
+    primitives::{AccountInfo, Bytecode, ExecutionResult, Output, TransactTo, TxEnv, keccak256},
+    Evm, EvmBuilder,
 };
 use std::str::FromStr;
 use std::time::Duration;
@@ -51,8 +46,8 @@ fn execute_revm(bytecode_hex: &str, calldata_hex: &str, gas_limit: u64) -> Resul
     let calldata = hex::decode(calldata_hex)?;
     
     
-    // Create database and context
-    let mut db = CacheDB::<EmptyDB>::default();
+    // Create database
+    let mut db = CacheDB::new(EmptyDB::default());
     
     // Deploy contract to a fixed address
     let contract_address = Address::from_str("0x1000000000000000000000000000000000000000")?;
@@ -81,38 +76,41 @@ fn execute_revm(bytecode_hex: &str, calldata_hex: &str, gas_limit: u64) -> Resul
         },
     );
     
-    // Create context and build EVM
-    let ctx = Context::mainnet().with_db(db);
-    let mut evm = ctx.build_mainnet();
+    // Build EVM
+    let mut evm = EvmBuilder::default()
+        .with_db(db)
+        .build();
     
-    // Execute the transaction
-    let tx_env = TxEnv::builder()
-        .kind(TxKind::Call(contract_address))
-        .caller(caller_address)
-        .data(Bytes::from(calldata))
-        .gas_limit(gas_limit)
-        .gas_price(1_000_000_000u128) // 1 gwei
-        .build()
-        .map_err(|e| anyhow::anyhow!("Failed to build transaction: {:?}", e))?;
+    // Set up transaction environment
+    evm.tx_mut().caller = caller_address;
+    evm.tx_mut().transact_to = TransactTo::Call(contract_address);
+    evm.tx_mut().data = Bytes::from(calldata);
+    evm.tx_mut().gas_limit = gas_limit;
+    evm.tx_mut().gas_price = U256::from(1_000_000_000u128); // 1 gwei
         
-    let result = evm.transact(tx_env)?;
+    let result = evm.transact_commit();
     
     // Check execution result
-    match result.result {
-        ExecutionResult::Success { 
-            gas_used: _, 
-            output: _, 
-            .. 
-        } => {
-            // Success! Execution completed without errors
-            Ok(())
+    match result {
+        Ok(exec_result) => {
+            match exec_result {
+                ExecutionResult::Success { 
+                    gas_used: _, 
+                    output: _, 
+                    .. 
+                } => {
+                    // Success! Execution completed without errors
+                    Ok(())
+                }
+                ExecutionResult::Revert { gas_used, output } => {
+                    bail!("EVM execution reverted - Gas: {}, Data: 0x{}", gas_used, hex::encode(&output));
+                }
+                ExecutionResult::Halt { reason, gas_used } => {
+                    bail!("EVM execution halted - Reason: {:?}, Gas: {}", reason, gas_used);
+                }
+            }
         }
-        ExecutionResult::Revert { gas_used, output } => {
-            bail!("EVM execution reverted - Gas: {}, Data: 0x{}", gas_used, hex::encode(&output));
-        }
-        ExecutionResult::Halt { reason, gas_used } => {
-            bail!("EVM execution halted - Reason: {:?}, Gas: {}", reason, gas_used);
-        }
+        Err(e) => bail!("EVM execution error: {:?}", e)
     }
 }
 
