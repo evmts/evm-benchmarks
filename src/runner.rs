@@ -136,6 +136,9 @@ fn determine_evms(
         // Guillotine is always available via the crates.io library
         available.push("guillotine".to_string());
         
+        // Ethrex is now available as a native library
+        available.push("ethrex".to_string());
+        
         Ok(available)
     } else if let Some(evms_list) = evms {
         Ok(evms_list.split(',').map(|s| s.trim().to_string()).collect())

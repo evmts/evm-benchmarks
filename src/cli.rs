@@ -15,7 +15,7 @@ pub struct Cli {
 pub enum Commands {
     /// Execute bytecode directly (used internally for benchmarking)
     Execute {
-        /// EVM implementation to use (geth, guillotine, revm)
+        /// EVM implementation to use (ethrex, geth, guillotine, revm)
         #[arg(long)]
         evm: String,
         
@@ -53,7 +53,7 @@ pub enum Commands {
         #[arg(long, default_value = "10")]
         internal_runs: usize,
         
-        /// Specific EVM implementation to use (geth, guillotine, revm)
+        /// Specific EVM implementation to use (ethrex, geth, guillotine, revm)
         #[arg(long)]
         evm: Option<String>,
         
