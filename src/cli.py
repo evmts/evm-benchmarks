@@ -14,7 +14,7 @@ from evm_benchmarks import get_evm_benchmarks, run_evm_benchmark
 from cli_display import (
     Colors, Spinner, ProgressBar, print_header, print_benchmark_header,
     print_benchmark_info, print_results_summary, print_final_summary,
-    print_error, print_warning, print_success, clear_line
+    print_error, print_warning, print_success, clear_line, print_matrix_summary
 )
 
 
@@ -98,6 +98,22 @@ def parse_arguments() -> argparse.Namespace:
         "--timeout",
         type=int,
         help="Timeout in seconds for each benchmark"
+    )
+    run_parser.add_argument(
+        "--evm",
+        type=str,
+        choices=["geth", "guillotine"],
+        help="Single EVM implementation to use"
+    )
+    run_parser.add_argument(
+        "--evms",
+        type=str,
+        help="Comma-separated list of EVM implementations (e.g., geth,guillotine)"
+    )
+    run_parser.add_argument(
+        "--all",
+        action="store_true",
+        help="Run all available EVM implementations"
     )
     
     # Compare command
@@ -191,6 +207,87 @@ def list_benchmarks(category: Optional[str] = None, verbose: bool = False) -> No
         print()
 
 
+def run_benchmark_matrix(
+    benchmark_name: Optional[str],
+    iterations: int,
+    warmup: int,
+    output: Optional[str],
+    export_json: Optional[str],
+    export_markdown: Optional[str],
+    timeout: Optional[int],
+    verbose: bool,
+    evms: List[str]
+) -> int:
+    """Run benchmarks across multiple EVM implementations."""
+    benchmarks = get_default_benchmarks()
+    
+    if benchmark_name and benchmark_name not in benchmarks:
+        print(f"Error: Unknown benchmark '{benchmark_name}'", file=sys.stderr)
+        print("Use 'list' command to see available benchmarks", file=sys.stderr)
+        return 1
+    
+    to_run = {benchmark_name: benchmarks[benchmark_name]} if benchmark_name else benchmarks
+    
+    # Print header
+    evms_str = ", ".join(evms)
+    print_header("EVM BENCHMARK MATRIX", f"Running {len(to_run)} benchmark(s) on {evms_str}")
+    
+    # Store results for matrix display
+    matrix_results = {}
+    
+    for evm in evms:
+        print(f"\n[94m{'='*80}[0m")
+        print(f"[1mTesting EVM: {evm.upper()}[0m")
+        print(f"[94m{'='*80}[0m\n")
+        
+        evm_results = {}
+        progress = ProgressBar(len(to_run))
+        
+        for idx, (name, config) in enumerate(to_run.items(), 1):
+            progress.update(idx - 1, f"Running {name} on {evm}...")
+            
+            # Print benchmark header
+            print_benchmark_header(name, config['description'], idx, len(to_run))
+            
+            if verbose:
+                print_benchmark_info(config)
+            
+            # Handle EVM benchmarks
+            if config.get('type') == 'evm':
+                spinner = Spinner(f"Running {name} ({iterations} iterations) on {evm}...")
+                spinner.start()
+                
+                try:
+                    result = run_evm_benchmark(name, config, iterations, use_hyperfine=True, verbose=verbose, evm_type=evm)
+                    spinner.stop(f"Benchmark {name} on {evm} completed", success=True)
+                    
+                    # Load and store results
+                    results_file = f"results_{name}.json"
+                    if Path(results_file).exists():
+                        with open(results_file, 'r') as f:
+                            results_data = json.load(f)
+                            evm_results[name] = results_data
+                            print_results_summary(results_data)
+                    
+                except Exception as e:
+                    spinner.stop(f"Benchmark {name} on {evm} failed: {e}", success=False)
+                    evm_results[name] = {"error": str(e)}
+        
+        progress.update(len(to_run), f"All benchmarks completed for {evm}")
+        matrix_results[evm] = evm_results
+    
+    # Print matrix summary
+    print_matrix_summary(matrix_results, to_run.keys())
+    
+    # Save matrix results if output specified
+    if output:
+        with open(output, 'w') as f:
+            json.dump(matrix_results, f, indent=2)
+        print_success(f"Matrix results saved to: {output}")
+    
+    return 0
+
+
 def run_benchmark(
     benchmark_name: Optional[str],
     iterations: int,
@@ -199,7 +296,8 @@ def run_benchmark(
     export_json: Optional[str],
     export_markdown: Optional[str],
     timeout: Optional[int],
-    verbose: bool
+    verbose: bool,
+    evm_type: str = "geth"
 ) -> int:
     """Run benchmarks using hyperfine."""
     benchmarks = get_default_benchmarks()
@@ -246,7 +344,7 @@ def run_benchmark(
             spinner.start()
             
             try:
-                result = run_evm_benchmark(name, config, iterations, use_hyperfine=True, verbose=verbose)
+                result = run_evm_benchmark(name, config, iterations, use_hyperfine=True, verbose=verbose, evm_type=evm_type)
                 spinner.stop(f"Benchmark {name} completed", success=True)
                 
                 # Load and display results
@@ -387,16 +485,53 @@ def main() -> int:
     
     try:
         if args.command == "run":
-            return run_benchmark(
-                args.benchmark,
-                args.iterations,
-                args.warmup,
-                args.output,
-                args.export_json,
-                args.export_markdown,
-                args.timeout,
-                args.verbose
-            )
+            # Determine which EVMs to run
+            evms_to_run = []
+            
+            if args.all:
+                # Run all available EVMs
+                evms_to_run = ["geth", "guillotine"]
+            elif args.evms:
+                # Parse comma-separated list
+                evms_to_run = [evm.strip() for evm in args.evms.split(",")]
+                # Validate EVMs
+                valid_evms = ["geth", "guillotine"]
+                for evm in evms_to_run:
+                    if evm not in valid_evms:
+                        print(f"Error: Unknown EVM '{evm}'. Valid options: {', '.join(valid_evms)}", file=sys.stderr)
+                        return 1
+            elif args.evm:
+                # Single EVM specified
+                evms_to_run = [args.evm]
+            else:
+                # Default to geth
+                evms_to_run = ["geth"]
+            
+            # Run matrix if multiple EVMs, otherwise single run
+            if len(evms_to_run) > 1:
+                return run_benchmark_matrix(
+                    args.benchmark,
+                    args.iterations,
+                    args.warmup,
+                    args.output,
+                    args.export_json,
+                    args.export_markdown,
+                    args.timeout,
+                    args.verbose,
+                    evms_to_run
+                )
+            else:
+                return run_benchmark(
+                    args.benchmark,
+                    args.iterations,
+                    args.warmup,
+                    args.output,
+                    args.export_json,
+                    args.export_markdown,
+                    args.timeout,
+                    args.verbose,
+                    evms_to_run[0]
+                )
         elif args.command == "compare":
             return compare_implementations(
                 args.implementations,
