@@ -48,6 +48,11 @@ coverage.xml
 
 # Virtual environments
 venv/
+
+# Go binaries
+bench
+bench-go
+*.exe
 ENV/
 env/
 .venv/
