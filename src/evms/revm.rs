@@ -1,22 +1,35 @@
-use anyhow::{Context, Result};
-use alloy_primitives::{Address, U256, Bytes, FixedBytes};
+use anyhow::Result;
+use alloy_primitives::{Address, U256, Bytes};
 use revm::{
     db::{CacheDB, EmptyDB},
-    interpreter::{InstructionResult, InterpreterResult},
-    primitives::{AccountInfo, Bytecode, ExecutionResult, Output, TransactTo, TxEnv, keccak256},
+    primitives::{AccountInfo, Bytecode, ExecutionResult, Output, TransactTo, keccak256},
     Evm, EvmBuilder,
 };
 use std::str::FromStr;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 use crate::evm::{EvmResult, EvmExecutor};
 
 pub struct RevmExecutor {
-    // We'll create a new instance for each execution for simplicity
+    evm: Evm<'static, (), CacheDB<EmptyDB>>,
+    contract_address: Address,
+    caller_address: Address,
 }
 
 impl RevmExecutor {
     pub fn new() -> Result<Self> {
-        Ok(Self {})
+        let db = CacheDB::new(EmptyDB::default());
+        let evm = EvmBuilder::default()
+            .with_db(db)
+            .build();
+        
+        let contract_address = Address::from_str("0x1000000000000000000000000000000000000000")?;
+        let caller_address = Address::from_str("0x0000000000000000000000000000000000000001")?;
+        
+        Ok(Self {
+            evm,
+            contract_address,
+            caller_address,
+        })
     }
 }
 
@@ -27,16 +40,10 @@ impl EvmExecutor for RevmExecutor {
         calldata: Vec<u8>,
         gas_limit: u64,
     ) -> Result<EvmResult> {
-        // Create database
-        let mut db = CacheDB::new(EmptyDB::default());
-        
-        // Deploy contract to a fixed address
-        let contract_address = Address::from_str("0x1000000000000000000000000000000000000000")?;
-        
         // Insert the contract code into the database as deployed code
         let bytecode_hash = keccak256(&bytecode);
-        db.insert_account_info(
-            contract_address,
+        self.evm.db_mut().insert_account_info(
+            self.contract_address,
             AccountInfo {
                 balance: U256::ZERO,
                 nonce: 1,
@@ -46,9 +53,8 @@ impl EvmExecutor for RevmExecutor {
         );
         
         // Also fund the caller account
-        let caller_address = Address::from_str("0x0000000000000000000000000000000000000001")?;
-        db.insert_account_info(
-            caller_address,
+        self.evm.db_mut().insert_account_info(
+            self.caller_address,
             AccountInfo {
                 balance: U256::from(1_000_000_000_000_000_000u128), // 1 ETH
                 nonce: 0,
@@ -57,20 +63,15 @@ impl EvmExecutor for RevmExecutor {
             },
         );
         
-        // Build EVM
-        let mut evm = EvmBuilder::default()
-            .with_db(db)
-            .build();
-        
         // Set up transaction environment
-        evm.tx_mut().caller = caller_address;
-        evm.tx_mut().transact_to = TransactTo::Call(contract_address);
-        evm.tx_mut().data = Bytes::from(calldata);
-        evm.tx_mut().gas_limit = gas_limit;
-        evm.tx_mut().gas_price = U256::from(1_000_000_000u128); // 1 gwei
+        self.evm.tx_mut().caller = self.caller_address;
+        self.evm.tx_mut().transact_to = TransactTo::Call(self.contract_address);
+        self.evm.tx_mut().data = Bytes::from(calldata);
+        self.evm.tx_mut().gas_limit = gas_limit;
+        self.evm.tx_mut().gas_price = U256::from(1_000_000_000u128); // 1 gwei
         
         let start = Instant::now();    
-        let result = evm.transact_commit();
+        let result = self.evm.transact_commit();
         let execution_time = start.elapsed();
         
         // Check execution result
