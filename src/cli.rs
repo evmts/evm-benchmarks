@@ -30,6 +30,10 @@ pub enum Commands {
         /// Gas limit
         #[arg(long)]
         gas: u64,
+        
+        /// Number of internal runs within a single benchmark execution
+        #[arg(long, default_value = "10")]
+        internal_runs: usize,
     },
     
     /// Run benchmarks
@@ -44,6 +48,10 @@ pub enum Commands {
         /// Number of warmup runs
         #[arg(short, long, default_value = "3")]
         warmup: usize,
+        
+        /// Number of internal runs within each benchmark execution
+        #[arg(long, default_value = "10")]
+        internal_runs: usize,
         
         /// Specific EVM implementation to use (geth, guillotine, revm)
         #[arg(long)]
@@ -95,13 +103,14 @@ pub enum Commands {
 impl Cli {
     pub fn execute(self) -> Result<()> {
         match self.command {
-            Commands::Execute { evm, bytecode, calldata, gas } => {
-                crate::evm::execute_bytecode(&evm, &bytecode, &calldata, gas)?;
+            Commands::Execute { evm, bytecode, calldata, gas, internal_runs } => {
+                crate::evm::execute_bytecode(&evm, &bytecode, &calldata, gas, internal_runs)?;
             }
             Commands::Run { 
                 benchmark,
                 iterations,
                 warmup,
+                internal_runs,
                 evm,
                 evms,
                 all,
@@ -113,6 +122,7 @@ impl Cli {
                     benchmark,
                     iterations,
                     warmup,
+                    internal_runs,
                     evm,
                     evms,
                     all,
