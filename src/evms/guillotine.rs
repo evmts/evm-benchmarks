@@ -1,6 +1,5 @@
 use anyhow::{Result, anyhow};
 use guillotine_ffi::{Evm, Address, U256};
-use std::time::Instant;
 use crate::evm::{EvmResult, EvmExecutor};
 
 pub struct GuillotineExecutor {
@@ -31,8 +30,6 @@ impl EvmExecutor for GuillotineExecutor {
         self.evm.set_code(contract_address, &bytecode)
             .map_err(|e| anyhow!("Failed to set contract code: {}", e))?;
         
-        let start = Instant::now();
-        
         // Try with input instead of data
         let result = self.evm.transact()
             .from(caller_address)
@@ -42,13 +39,10 @@ impl EvmExecutor for GuillotineExecutor {
             .execute()
             .map_err(|e| anyhow!("Failed to execute transaction: {}", e))?;
         
-        let execution_time = start.elapsed();
-        
         Ok(EvmResult {
             success: result.is_success(),
             gas_used: result.gas_used,
             output: result.output().to_vec(),
-            execution_time,
             logs: Vec::new(),
         })
     }

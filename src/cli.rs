@@ -122,7 +122,6 @@ impl Cli {
                     benchmark,
                     iterations,
                     warmup,
-                    internal_runs,
                     evm,
                     evms,
                     all,
