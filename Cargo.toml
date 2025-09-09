@@ -34,6 +34,12 @@ alloy-primitives = "0.8"
 # Guillotine - Zig EVM with Rust SDK
 guillotine-rs = { path = "evms/guillotine/sdks/rust" }
 
+# Ethrex - Rust EVM implementation
+ethrex-vm = { path = "evms/ethrex/crates/vm" }
+ethrex-common = { path = "evms/ethrex/crates/common" }
+ethrex-storage = { path = "evms/ethrex/crates/storage" }
+ethrex-blockchain = { path = "evms/ethrex/crates/blockchain" }
+
 # For timing benchmarks
 criterion = { version = "0.5", default-features = false }
 

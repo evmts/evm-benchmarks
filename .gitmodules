@@ -1,3 +1,6 @@
 [submodule "evms/guillotine"]
 	path = evms/guillotine
 	url = https://github.com/evmts/Guillotine.git
+[submodule "evms/ethrex"]
+	path = evms/ethrex
+	url = https://github.com/lambdaclass/ethrex.git

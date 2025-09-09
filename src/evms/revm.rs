@@ -6,7 +6,6 @@ use revm::{
     Evm, EvmBuilder,
 };
 use std::str::FromStr;
-use std::time::Instant;
 use crate::evm::{EvmResult, EvmExecutor};
 
 pub struct RevmExecutor {
@@ -70,9 +69,7 @@ impl EvmExecutor for RevmExecutor {
         self.evm.tx_mut().gas_limit = gas_limit;
         self.evm.tx_mut().gas_price = U256::from(1_000_000_000u128); // 1 gwei
         
-        let start = Instant::now();    
         let result = self.evm.transact_commit();
-        let execution_time = start.elapsed();
         
         // Check execution result
         match result {
@@ -92,7 +89,6 @@ impl EvmExecutor for RevmExecutor {
                             success: true,
                             gas_used,
                             output: output_bytes,
-                            execution_time,
                             logs: Vec::new(),
                         })
                     }
@@ -101,7 +97,6 @@ impl EvmExecutor for RevmExecutor {
                             success: false,
                             gas_used,
                             output: output.to_vec(),
-                            execution_time,
                             logs: Vec::new(),
                         })
                     }
@@ -110,7 +105,6 @@ impl EvmExecutor for RevmExecutor {
                             success: false,
                             gas_used,
                             output: format!("Halted: {:?}", reason).into_bytes(),
-                            execution_time,
                             logs: Vec::new(),
                         })
                     }
