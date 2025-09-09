@@ -16,21 +16,23 @@ cd bench
 # Dependencies
 brew install hyperfine
 curl -L https://foundry.paradigm.xyz | bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
 # Build
-go build -o bench cmd/bench/main.go
+cargo build --release
 forge build
 
 # Run
-./bench run
+./target/release/bench run
 ```
 
 ## Usage
 
 ```bash
-./bench run                    # Interactive TUI
-./bench run --all --no-tui     # All EVMs
-./bench run --evm geth         # Specific EVM
+./target/release/bench run                    # Run all benchmarks
+./target/release/bench run --all              # All EVMs
+./target/release/bench run --evm geth         # Specific EVM
+./target/release/bench list                   # List available benchmarks
 ```
 
 ## Benchmarks

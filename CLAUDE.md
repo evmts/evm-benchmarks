@@ -4,7 +4,7 @@
 This repository contains benchmarking tools for comparing Ethereum Virtual Machine (EVM) implementations. The primary goal is to provide accurate, reproducible performance measurements across different EVM implementations including **geth**, **guillotine**, and **revm**.
 
 ## Implementation Language
-This project is implemented in **Go** with an interactive TUI built using Bubble Tea. The previous Python implementation has been deprecated in favor of better performance and a richer user experience.
+This project is being migrated to **Rust** using the Clap framework for robust CLI functionality and superior performance.
 
 ## Critical Benchmark Integrity Rules
 
@@ -25,15 +25,9 @@ Benchmarks are only valuable if they measure real performance. Any compromise in
 ## Repository Structure
 ```
 bench/
-├── cmd/bench/                 # CLI entry point
-│   └── main.go               # Main application with urfave/cli
-├── internal/
-│   ├── benchmark/            # Core benchmark logic
-│   │   ├── evm.go           # EVM benchmark definitions
-│   │   └── runner.go        # Benchmark execution
-│   └── tui/                 # Bubble Tea TUI components
-│       ├── model.go         # TUI state management
-│       └── styles.go        # Lipgloss styling
+├── src/                      # Rust source code
+│   └── main.rs              # Main CLI application
+├── Cargo.toml               # Rust package manifest
 ├── benchmarks/
 │   ├── solidity/            # Solidity benchmark contracts
 │   │   ├── TenThousandHashes.sol
@@ -48,7 +42,6 @@ bench/
 │   ├── guillotine-go-sdk/   # Guillotine EVM implementation (git submodule)
 │   └── revm/                # Revm implementation (git submodule)
 ├── out/                     # Foundry build artifacts
-├── go.mod                   # Go module definition
 ├── Makefile                 # Build automation
 └── results_*.json           # Benchmark results for each test
 ```
@@ -86,54 +79,54 @@ bench/
 
 ## Running Benchmarks
 
-### Basic Usage
+### Basic Usage (Rust CLI)
 ```bash
-# Build the Go CLI
-make build-go
+# Build the Rust CLI
+cargo build --release
 
-# Run all benchmarks with TUI
-./bench run
+# Run all benchmarks
+./target/release/bench run
 
 # Run specific benchmark
-./bench run ten_thousand_hashes
+./target/release/bench run ten_thousand_hashes
 
-# Run without TUI
-./bench run --no-tui
+# Run with custom iterations
+./target/release/bench run --iterations 20 --warmup 5
 
 # Run on specific EVM
-./bench run --evm guillotine --no-tui
+./target/release/bench run --evm guillotine
 
 # Run matrix benchmark across multiple EVMs
-./bench run --evms geth,guillotine
-./bench run --all  # Run on all available EVMs
+./target/release/bench run --evms geth,guillotine
+./target/release/bench run --all  # Run on all available EVMs
 ```
 
 ### Advanced Options
 ```bash
 # Customize iterations and warmup
-./bench run --iterations 20 --warmup 5 --no-tui
+./target/release/bench run --iterations 20 --warmup 5
 
 # Export results
-./bench run --output results.json --export-json hyperfine.json
+./target/release/bench run --output results.json --export-json hyperfine.json
 
 # Verbose output
-./bench run -v --no-tui
+./target/release/bench run -v
 ```
 
 ### Matrix Benchmarking
 The CLI supports running benchmarks across multiple EVM implementations simultaneously:
 ```bash
 # Compare geth and guillotine
-./bench run --evms geth,guillotine
+./target/release/bench run --evms geth,guillotine
 
 # Run all benchmarks on all EVMs
-./bench run --all --no-tui
+./target/release/bench run --all
 
 # Compare implementations
-./bench compare geth guillotine revm
+./target/release/bench compare geth guillotine revm
 
 # Save matrix results
-./bench run --all --output full_matrix.json
+./target/release/bench run --all --output full_matrix.json
 ```
 
 Matrix results include:
@@ -144,12 +137,12 @@ Matrix results include:
 
 ## Key Features
 
-### 1. Interactive TUI (Bubble Tea)
-The Go implementation features a beautiful terminal UI:
-- Real-time progress tracking
-- Keyboard navigation (↑/↓, j/k, Enter, a, q)
-- Color-coded status indicators
-- Live benchmark results
+### 1. Robust CLI with Clap
+The Rust implementation features:
+- Type-safe command parsing with Clap
+- High-performance execution
+- Structured subcommands and options
+- Cross-platform compatibility
 
 ### 2. Hyperfine Integration
 All benchmarks use [hyperfine](https://github.com/sharkdp/hyperfine) for accurate measurements:
@@ -202,57 +195,26 @@ cargo build --release -p revme
 ### Adding New Benchmarks
 1. Create Solidity contract in `benchmarks/solidity/`
 2. Compile with Foundry: `forge build`
-3. Add configuration in `internal/benchmark/evm.go`:
-```go
-if bytecode, err := GetContractBytecode("ContractName"); err == nil {
-    benchmarks["new_benchmark"] = &Benchmark{
-        Name:        "new_benchmark",
-        Description: "Description of benchmark",
-        Category:    "compute|token|storage",
-        Type:        "evm",
-        Bytecode:    bytecode,
-        Calldata:    GetFunctionSelector("functionName()"),
-        Gas:         30000000,
-    }
-}
-```
+3. Add configuration in the Rust implementation to include the new benchmark
 
 ### Adding New EVM Implementation
-1. Add binary finder function in `internal/benchmark/evm.go`:
-```go
-func FindNewEVMBinary() (string, error) {
-    // Logic to locate the EVM binary
-}
-```
-
-2. Add runner function in `internal/benchmark/runner.go`:
-```go
-func runNewEVMBenchmark(bench *Benchmark, iterations int, useHyperfine bool, verbose bool) (*BenchmarkResult, error) {
-    // Implementation-specific execution logic
-}
-```
-
-3. Update `RunEVMBenchmark()` to route to new implementation
+1. Add binary finder logic in Rust implementation
+2. Add runner function for the new EVM
+3. Update benchmark runner to route to new implementation
 
 ### Testing
 ```bash
-# Run Go tests
-make test-go
-
-# Run with verbose output
-go test -v ./...
+# Run Rust tests
+cargo test
 
 # Run Solidity tests
 forge test
 
-# Format code
-go fmt ./...
-
-# Run vet
-go vet ./...
-
 # Run a quick benchmark test
-./bench run ten_thousand_hashes --iterations 3 --no-tui
+./target/release/bench run ten_thousand_hashes --iterations 3
+
+# Test with verbose output
+./target/release/bench run -v
 ```
 
 ## Performance Considerations
@@ -318,22 +280,24 @@ Results are stored as JSON with hyperfine statistics:
    - Run `forge build` to compile Solidity contracts
    - Check `out/` directory for compiled artifacts
 
-6. **TUI not working**
-   - Use `--no-tui` flag for non-interactive mode
-   - Ensure terminal supports ANSI escape codes
-   - Check that TERM environment variable is set
-
-7. **Build errors**
-   - Update dependencies: `go mod tidy`
-   - Clear module cache: `go clean -modcache`
+6. **Rust CLI issues**
+   - Build with: `cargo build --release`
+   - Check Rust version: requires Rust 1.70+
+   - Verify hyperfine is installed
 
 ## Recent Updates
 
-### Go Implementation (v3.0)
-- Complete rewrite in Go for better performance
-- Interactive TUI with Bubble Tea
-- Improved error handling and type safety
-- Concurrent benchmark execution support
+### Foundry Compilers Integration (v6.0)
+- Integrated foundry-compilers crate for Solidity compilation
+- Removed dependency on external Foundry installation
+- Contracts are compiled on-demand by the benchmarking orchestrator
+- Compilation happens transparently before benchmark execution
+
+### Rust Implementation (v5.0)
+- Migrated to Rust with Clap for superior performance
+- Type-safe CLI with structured commands
+- Native performance for benchmark execution
+- Cross-platform compatibility
 
 ### Matrix Benchmarking (v2.0)
 - Compare multiple EVM implementations side-by-side
