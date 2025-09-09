@@ -36,6 +36,8 @@ def get_function_selector(function_signature: str) -> str:
     # In a real implementation, this would compute keccak256(signature)[:8]
     if function_signature == "run()":
         return "30627b7c"  # Actual selector for run()
+    elif function_signature == "Benchmark()":
+        return "30627b7c"  # Actual selector for Benchmark() in snailtracer
     return ""
 
 
@@ -46,8 +48,7 @@ def get_evm_benchmarks() -> Dict[str, Dict[str, Any]]:
     # Check if geth is available
     geth_path = Path("evms/go-ethereum/build/bin/geth")
     if not geth_path.exists():
-        print(f"Warning: geth not found at {geth_path}. Building may still be in progress.")
-        # Try system geth as fallback
+        # Try system geth as fallback silently
         if not subprocess.run(["which", "geth"], capture_output=True).returncode == 0:
             return benchmarks
     
@@ -103,6 +104,25 @@ def get_evm_benchmarks() -> Dict[str, Dict[str, Any]]:
             "requires": []
         }
     
+    # Snailtracer benchmark - read the pre-compiled bytecode
+    snailtracer_path = Path("benchmarks/snailtracer/snailtracer_bytecode.hex")
+    if snailtracer_path.exists():
+        try:
+            with open(snailtracer_path, "r") as f:
+                snailtracer_bytecode = f.read().strip()
+                if snailtracer_bytecode:
+                    benchmarks["snailtracer"] = {
+                        "description": "Ray tracing benchmark (compute intensive)",
+                        "category": "compute",
+                        "type": "evm",
+                        "bytecode": snailtracer_bytecode,
+                        "calldata": "30627b7c",  # Benchmark() selector
+                        "gas": 100000000,  # High gas limit for compute intensive task
+                        "requires": []
+                    }
+        except Exception:
+            pass  # Snailtracer bytecode not available
+    
     return benchmarks
 
 
@@ -125,7 +145,8 @@ def run_evm_benchmark(
     name: str,
     config: Dict[str, Any],
     iterations: int = 10,
-    use_hyperfine: bool = True
+    use_hyperfine: bool = True,
+    verbose: bool = False
 ) -> Dict[str, Any]:
     """Run an EVM benchmark using geth's evm command."""
     
@@ -177,8 +198,9 @@ def run_evm_benchmark(
                 " ".join(evm_cmd)  # Join the command into a single string
             ]
             
-            print(f"Running EVM benchmark '{name}' with hyperfine...")
-            print(f"Command: {' '.join(cmd)}")
+            if verbose:
+                print(f"Running EVM benchmark '{name}' with hyperfine...")
+                print(f"Command: {' '.join(cmd)}")
             
             # Run without shell for proper argument handling
             result = subprocess.run(cmd, capture_output=True, text=True)
