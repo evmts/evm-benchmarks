@@ -230,7 +230,7 @@ build_evms() {
         print_status "Building Guillotine EVM..."
         (
             cd evms/guillotine-go-sdk
-            if zig build; then
+            if zig build -Doptimize=ReleaseFast; then
                 cd apps/cli
                 if go build -o guillotine-bench .; then
                     print_success "Guillotine EVM built successfully"
