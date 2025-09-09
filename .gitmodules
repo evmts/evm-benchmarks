@@ -1,3 +1,9 @@
 [submodule "evms/go-ethereum"]
 	path = evms/go-ethereum
 	url = git@github.com:ethereum/go-ethereum.git
+[submodule "evms/guillotine-go-sdk"]
+	path = evms/guillotine-go-sdk
+	url = https://github.com/evmts/Guillotine.git
+[submodule "evms/revm"]
+	path = evms/revm
+	url = https://github.com/bluealloy/revm.git
