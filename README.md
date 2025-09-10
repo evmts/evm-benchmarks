@@ -11,50 +11,50 @@ Latest benchmark results comparing Guillotine and Revm EVMs (5 iterations):
 
 | EVM | Mean (s) | Std Dev | Min (s) | Max (s) | Median (s) |
 |-----|----------|---------|---------|---------|------------|
-| ⚡ guillotine | 0.0494 | 0.0003 | 0.0490 | 0.0501 | 0.0493 |
-| revm | 0.0599 | 0.0114 | 0.0555 | 0.0922 | 0.0562 |
+| ⚡ guillotine | 0.0484 | 0.0007 | 0.0477 | 0.0500 | 0.0483 |
+| revm | 0.0558 | 0.0002 | 0.0554 | 0.0560 | 0.0559 |
 
-**Performance**: guillotine is 1.21x faster than revm
+**Performance**: guillotine is 1.15x faster than revm
 
 ### erc20_transfer_bench
 *Benchmark ERC20 transfer operations*
 
 | EVM | Mean (s) | Std Dev | Min (s) | Max (s) | Median (s) |
 |-----|----------|---------|---------|---------|------------|
-| ⚡ guillotine | 0.0611 | 0.0005 | 0.0605 | 0.0620 | 0.0611 |
-| revm | 0.0695 | 0.0005 | 0.0689 | 0.0704 | 0.0695 |
+| ⚡ guillotine | 0.0596 | 0.0014 | 0.0586 | 0.0626 | 0.0589 |
+| revm | 0.0695 | 0.0005 | 0.0689 | 0.0707 | 0.0693 |
 
-**Performance**: guillotine is 1.14x faster than revm
+**Performance**: guillotine is 1.17x faster than revm
 
 ### erc20_mint_bench
 *Benchmark ERC20 minting operations*
 
 | EVM | Mean (s) | Std Dev | Min (s) | Max (s) | Median (s) |
 |-----|----------|---------|---------|---------|------------|
-| ⚡ guillotine | 0.0443 | 0.0005 | 0.0435 | 0.0448 | 0.0445 |
-| revm | 0.0467 | 0.0005 | 0.0459 | 0.0476 | 0.0466 |
+| ⚡ guillotine | 0.0434 | 0.0012 | 0.0420 | 0.0458 | 0.0430 |
+| revm | 0.0465 | 0.0009 | 0.0460 | 0.0488 | 0.0462 |
 
-**Performance**: guillotine is 1.06x faster than revm
+**Performance**: guillotine is 1.07x faster than revm
 
 ### ten_thousand_hashes
 *Execute 10,000 keccak256 hash operations*
 
 | EVM | Mean (s) | Std Dev | Min (s) | Max (s) | Median (s) |
 |-----|----------|---------|---------|---------|------------|
-| ⚡ guillotine | 0.0581 | 0.0006 | 0.0574 | 0.0594 | 0.0580 |
-| revm | 0.0876 | 0.0019 | 0.0854 | 0.0909 | 0.0871 |
+| ⚡ guillotine | 0.0565 | 0.0005 | 0.0557 | 0.0572 | 0.0565 |
+| revm | 0.0902 | 0.0029 | 0.0875 | 0.0979 | 0.0895 |
 
-**Performance**: guillotine is 1.51x faster than revm
+**Performance**: guillotine is 1.60x faster than revm
 
 ### snailtracer
 *Ray tracing benchmark (compute intensive, 1B gas)*
 
 | EVM | Mean (s) | Std Dev | Min (s) | Max (s) | Median (s) |
 |-----|----------|---------|---------|---------|------------|
-| ⚡ guillotine | 0.2600 | 0.0011 | 0.2584 | 0.2621 | 0.2598 |
-| revm | 0.3145 | 0.0021 | 0.3111 | 0.3169 | 0.3152 |
+| ⚡ guillotine | 0.2542 | 0.0017 | 0.2519 | 0.2565 | 0.2538 |
+| revm | 0.3278 | 0.0029 | 0.3233 | 0.3334 | 0.3283 |
 
-**Performance**: guillotine is 1.21x faster than revm
+**Performance**: guillotine is 1.29x faster than revm
 
 ## Features
 

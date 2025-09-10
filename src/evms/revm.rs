@@ -1,31 +1,28 @@
 use anyhow::Result;
-use alloy_primitives::{Address, U256, Bytes};
 use revm::{
-    db::{CacheDB, EmptyDB},
-    primitives::{AccountInfo, Bytecode, ExecutionResult, Output, TransactTo, keccak256},
-    Evm, EvmBuilder,
+    context::{Context, TxEnv},
+    context_interface::result::{ExecutionResult, Output},
+    database::CacheDB,
+    database_interface::EmptyDB,
+    primitives::{Address, U256, Bytes, TxKind, keccak256, KECCAK_EMPTY},
+    bytecode::Bytecode,
+    state::AccountInfo,
+    ExecuteCommitEvm, MainBuilder, MainContext,
 };
 use std::str::FromStr;
 use crate::evm::{EvmResult, EvmExecutor};
 
 pub struct RevmExecutor {
-    evm: Evm<'static, (), CacheDB<EmptyDB>>,
     contract_address: Address,
     caller_address: Address,
 }
 
 impl RevmExecutor {
     pub fn new() -> Result<Self> {
-        let db = CacheDB::new(EmptyDB::default());
-        let evm = EvmBuilder::default()
-            .with_db(db)
-            .build();
-        
         let contract_address = Address::from_str("0x1000000000000000000000000000000000000000")?;
         let caller_address = Address::from_str("0x0000000000000000000000000000000000000001")?;
         
         Ok(Self {
-            evm,
             contract_address,
             caller_address,
         })
@@ -39,9 +36,12 @@ impl EvmExecutor for RevmExecutor {
         calldata: Vec<u8>,
         gas_limit: u64,
     ) -> Result<EvmResult> {
+        // Create a fresh database for each execution
+        let mut cache_db = CacheDB::<EmptyDB>::default();
+        
         // Insert the contract code into the database as deployed code
         let bytecode_hash = keccak256(&bytecode);
-        self.evm.db_mut().insert_account_info(
+        cache_db.insert_account_info(
             self.contract_address,
             AccountInfo {
                 balance: U256::ZERO,
@@ -52,24 +52,34 @@ impl EvmExecutor for RevmExecutor {
         );
         
         // Also fund the caller account
-        self.evm.db_mut().insert_account_info(
+        cache_db.insert_account_info(
             self.caller_address,
             AccountInfo {
                 balance: U256::from(1_000_000_000_000_000_000u128), // 1 ETH
                 nonce: 0,
-                code_hash: keccak256(&[]),
+                code_hash: KECCAK_EMPTY,
                 code: None,
             },
         );
         
-        // Set up transaction environment
-        self.evm.tx_mut().caller = self.caller_address;
-        self.evm.tx_mut().transact_to = TransactTo::Call(self.contract_address);
-        self.evm.tx_mut().data = Bytes::from(calldata);
-        self.evm.tx_mut().gas_limit = gas_limit;
-        self.evm.tx_mut().gas_price = U256::from(1_000_000_000u128); // 1 gwei
+        // Build transaction
+        let tx = TxEnv::builder()
+            .caller(self.caller_address)
+            .kind(TxKind::Call(self.contract_address))
+            .data(Bytes::from(calldata))
+            .gas_limit(gas_limit)
+            .gas_price(1_000_000_000u128) // 1 gwei
+            .build()
+            .unwrap();
         
-        let result = self.evm.transact_commit();
+        // Build context and EVM
+        let ctx = Context::mainnet()
+            .with_db(cache_db);
+        
+        let mut evm = ctx.build_mainnet();
+        
+        // Execute the transaction
+        let result = evm.transact_commit(tx);
         
         // Check execution result
         match result {
@@ -87,7 +97,7 @@ impl EvmExecutor for RevmExecutor {
                         
                         Ok(EvmResult {
                             success: true,
-                            gas_used,
+                            gas_used: gas_used as u64,
                             output: output_bytes,
                             logs: Vec::new(),
                         })
@@ -95,7 +105,7 @@ impl EvmExecutor for RevmExecutor {
                     ExecutionResult::Revert { gas_used, output } => {
                         Ok(EvmResult {
                             success: false,
-                            gas_used,
+                            gas_used: gas_used as u64,
                             output: output.to_vec(),
                             logs: Vec::new(),
                         })
@@ -103,7 +113,7 @@ impl EvmExecutor for RevmExecutor {
                     ExecutionResult::Halt { reason, gas_used } => {
                         Ok(EvmResult {
                             success: false,
-                            gas_used,
+                            gas_used: gas_used as u64,
                             output: format!("Halted: {:?}", reason).into_bytes(),
                             logs: Vec::new(),
                         })
