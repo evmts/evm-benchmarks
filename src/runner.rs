@@ -42,6 +42,7 @@ pub fn run_benchmarks(
     evm: Option<String>,
     evms: Option<String>,
     all: bool,
+    guillotine_path: Option<PathBuf>,
     output: Option<PathBuf>,
     _export_json: Option<PathBuf>,
     verbose: bool,
@@ -87,6 +88,7 @@ pub fn run_benchmarks(
                 &benchmark,
                 iterations,
                 warmup,
+                guillotine_path.as_ref(),
                 verbose,
             )?;
             
@@ -146,6 +148,7 @@ fn run_single_benchmark(
     benchmark: &Benchmark,
     iterations: usize,
     warmup: usize,
+    guillotine_path: Option<&PathBuf>,
     verbose: bool,
 ) -> Result<BenchmarkResult> {
     // Get path to our own executable
@@ -172,6 +175,13 @@ fn run_single_benchmark(
        .arg("--warmup").arg(warmup.to_string())
        .arg("--export-json").arg(json_path)
        .arg("--shell").arg("none");
+    
+    // Set GUILLOTINE_PATH environment variable if provided
+    if let Some(path) = guillotine_path {
+        if evm_name == "guillotine" {
+            cmd.env("GUILLOTINE_PATH", path);
+        }
+    }
     
     // Add the command
     cmd.arg(&bench_cmd);
@@ -226,6 +236,7 @@ pub fn compare_evms(
         None,
         Some(evms.join(",")),
         false,
+        None,  // guillotine_path
         output,
         None,
         false,

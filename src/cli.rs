@@ -65,6 +65,10 @@ pub enum Commands {
         #[arg(long, conflicts_with_all = &["evm", "evms"])]
         all: bool,
         
+        /// Override path to Guillotine library directory (for local development)
+        #[arg(long, env = "GUILLOTINE_PATH")]
+        guillotine_path: Option<PathBuf>,
+        
         /// Output file for results
         #[arg(short, long)]
         output: Option<PathBuf>,
@@ -114,6 +118,7 @@ impl Cli {
                 evm,
                 evms,
                 all,
+                guillotine_path,
                 output,
                 export_json,
                 verbose,
@@ -125,6 +130,7 @@ impl Cli {
                     evm,
                     evms,
                     all,
+                    guillotine_path,
                     output,
                     export_json,
                     verbose,

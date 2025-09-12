@@ -1,14 +1,16 @@
 use anyhow::{Result, anyhow};
-use guillotine_ffi::{Evm, Address, U256};
 use crate::evm::{EvmResult, EvmExecutor};
 
+// Import from guillotine_rs crate (guillotine-rs in Cargo.toml)
+use guillotine_rs::{StatefulEvm, Address, U256};
+
 pub struct GuillotineExecutor {
-    evm: Evm,
+    evm: StatefulEvm,
 }
 
 impl GuillotineExecutor {
     pub fn new() -> Result<Self> {
-        let evm = Evm::new()
+        let evm = StatefulEvm::new()
             .map_err(|e| anyhow!("Failed to create Guillotine EVM instance: {}", e))?;
         Ok(Self { evm })
     }
@@ -30,19 +32,19 @@ impl EvmExecutor for GuillotineExecutor {
         self.evm.set_code(contract_address, &bytecode)
             .map_err(|e| anyhow!("Failed to set contract code: {}", e))?;
         
-        // Try with input instead of data
-        let result = self.evm.transact()
-            .from(caller_address)
-            .to(contract_address)
-            .input(calldata)
-            .gas_limit(gas_limit)
-            .execute()
-            .map_err(|e| anyhow!("Failed to execute transaction: {}", e))?;
+        // Execute transaction directly
+        let result = self.evm.execute(
+            caller_address,
+            Some(contract_address),
+            U256::from(0),
+            &calldata,
+            gas_limit,
+        ).map_err(|e| anyhow!("Failed to execute transaction: {}", e))?;
         
         Ok(EvmResult {
-            success: result.is_success(),
+            success: result.success,
             gas_used: result.gas_used,
-            output: result.output().to_vec(),
+            output: result.output.to_vec(),
             logs: Vec::new(),
         })
     }
