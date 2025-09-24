@@ -5,5 +5,5 @@
   "contract": "SnailTracer.sol",
   "calldata": "0x30627b7c",
   "warmup": 2,
-  "gas_limit": 30000000
+  "gas_limit": 1000000000
 }

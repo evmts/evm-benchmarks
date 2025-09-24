@@ -12,10 +12,8 @@ pub fn build(b: *std.Build) void {
     // means any target is allowed, and the default is native. Other options
     // for restricting supported target set are available.
     const target = b.standardTargetOptions(.{});
-    // Standard optimization options allow the person running `zig build` to select
-    // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall. Here we do not
-    // set a preferred release mode, allowing the user to decide how to optimize.
-    const optimize = b.standardOptimizeOption(.{});
+    // Benchmarks must always use maximum performance optimization
+    const optimize = std.builtin.OptimizeMode.ReleaseFast;
     
     // Add Cargo build step for REVM runner
     const cargo_build = b.addSystemCommand(&[_][]const u8{
@@ -128,7 +126,7 @@ pub fn build(b: *std.Build) void {
     const guillotine_exe = b.addExecutable(.{
         .name = "guillotine-runner",
         .root_module = b.createModule(.{
-            .root_source_file = b.path("src/guillotine_runner_c.zig"),
+            .root_source_file = b.path("src/guillotine_runner.zig"),
             .target = target,
             .optimize = optimize,
             .imports = &.{
@@ -206,15 +204,19 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_mod_tests.step);
     test_step.dependOn(&run_exe_tests.step);
 
-    // Just like flags, top level steps are also listed in the `--help` menu.
-    //
-    // The Zig build system is entirely implemented in userland, which means
-    // that it cannot hook into private compiler APIs. All compilation work
-    // orchestrated by the build system will result in other Zig compiler
-    // subcommands being invoked with the right flags defined. You can observe
-    // these invocations when one fails (or you pass a flag to increase
-    // verbosity) to validate assumptions and diagnose problems.
-    //
-    // Lastly, the Zig build system is relatively simple and self-contained,
-    // and reading its source code will allow you to master it.
+    // Add benchmark step that runs all benchmarks
+    const benchmark_step = b.step("benchmark", "Run all benchmarks and generate results.md");
+    const benchmark_cmd = b.addRunArtifact(exe);
+    benchmark_cmd.addArg("--results");  // Generate results.md with real data
+    benchmark_step.dependOn(&benchmark_cmd.step);
+    
+    // Add benchmark-single step for running a specific benchmark
+    const single_bench = b.option([]const u8, "bench", "Specific benchmark to run");
+    if (single_bench) |bench_name| {
+        const single_bench_step = b.step("benchmark-single", "Run a specific benchmark");
+        const single_bench_cmd = b.addRunArtifact(exe);
+        single_bench_cmd.addArg("-f");
+        single_bench_cmd.addArg(bench_name);
+        single_bench_step.dependOn(&single_bench_cmd.step);
+    }
 }
