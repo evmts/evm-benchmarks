@@ -1,0 +1,9 @@
+{
+  "name": "factorial",
+  "num_runs": 5,
+  "solc_version": "0.8.17",
+  "contract": "Factorial.sol",
+  "calldata": "0x239b51bf0000000000000000000000000000000000000000000000000000000000000014",
+  "warmup": 2,
+  "gas_limit": 30000000
+}
