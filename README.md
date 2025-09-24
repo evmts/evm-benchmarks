@@ -13,16 +13,23 @@ The suite compiles Solidity contracts and measures their execution performance a
 
 ## Quick Start
 
-The easiest way to get started is to run the automated setup script:
-
 ```bash
-./getting-started.sh
+# Setup and run all benchmarks
+./run.sh
+
+# Or just setup without running benchmarks
+./run.sh setup
+
+# Run a specific benchmark
+./run.sh factorial
 ```
 
-This script will:
-1. Check and install all prerequisites
-2. Build the project
-3. Run a sample benchmark to verify everything works
+The `run.sh` script will:
+1. Check for prerequisites (Zig, Rust, Hyperfine)
+2. Build the entire project
+3. Run benchmarks and generate results
+
+📊 **[View Latest Benchmark Results](./results.md)**
 
 ## Manual Setup
 
@@ -164,7 +171,8 @@ bench/
 │   ├── *.sol             # Solidity contracts
 │   └── *.json            # Benchmark configurations
 ├── build.zig             # Build configuration
-└── getting-started.sh    # Setup script
+├── run.sh                # Setup and benchmark runner
+└── results.md            # Benchmark results (auto-generated)
 ```
 
 ## Adding New Benchmarks
@@ -199,7 +207,7 @@ Note: The calldata should include the function selector for `Benchmark(uint256)`
 
 3. Run your benchmark:
 ```bash
-./zig-out/bin/bench -f mybenchmark
+./run.sh mybenchmark
 ```
 
 ## Troubleshooting
