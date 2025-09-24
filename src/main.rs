@@ -27,6 +27,10 @@ struct Args {
     /// EVM implementation to use (revm or ethrex)
     #[arg(short = 'e', long, default_value = "revm")]
     evm: String,
+    
+    /// Number of internal runs for benchmarking
+    #[arg(short = 'i', long, default_value_t = 1)]
+    internal_runs: u32,
 }
 
 fn decode_hex(s: &str) -> Result<Vec<u8>> {
@@ -54,26 +58,24 @@ fn main() -> Result<()> {
         }
     };
     
-    println!("Executing with {}...", executor.name());
-    println!("Bytecode: {} bytes", bytecode.len());
-    println!("Calldata: {} bytes", calldata.len());
-    println!("Gas limit: {}", args.gas_limit);
-    println!();
-
-    // Execute
-    let result = executor.execute(bytecode, calldata, args.gas_limit)?;
-
-    // Print results
-    println!("Execution Result:");
-    println!("  Success: {}", result.success);
-    println!("  Gas used: {}", result.gas_used);
-    println!("  Output: 0x{}", hex::encode(&result.output));
-    
-    if !result.logs.is_empty() {
-        println!("  Logs:");
-        for log in &result.logs {
-            println!("    {}", log);
+    // Execute multiple internal runs
+    let mut last_result = None;
+    for _ in 0..args.internal_runs {
+        let result = executor.execute(bytecode.clone(), calldata.clone(), args.gas_limit)?;
+        
+        // Output only essential benchmark data for each run
+        println!("{}", result.success);
+        println!("{}", result.gas_used);
+        
+        // Debug: if failed, show why (only on first failure)
+        if !result.success && last_result.is_none() {
+            eprintln!("Execution failed. Gas used: {}", result.gas_used);
+            if !result.output.is_empty() {
+                eprintln!("Output: 0x{}", hex::encode(&result.output));
+            }
         }
+        
+        last_result = Some(result);
     }
 
     Ok(())

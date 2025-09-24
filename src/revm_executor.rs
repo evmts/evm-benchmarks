@@ -55,7 +55,7 @@ impl EvmExecutor for RevmExecutor {
         cache_db.insert_account_info(
             self.caller_address,
             AccountInfo {
-                balance: U256::from(1_000_000_000_000_000_000u128), // 1 ETH
+                balance: U256::from(100_000_000_000_000_000_000u128), // 100 ETH
                 nonce: 0,
                 code_hash: KECCAK_EMPTY,
                 code: None,

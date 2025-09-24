@@ -50,7 +50,7 @@ impl EvmExecutor for EthrexExecutor {
             ),
             (
                 Address::from_low_u64_be(SENDER_ADDRESS),
-                Account::new(U256::from(1_000_000_000_000_000_000u128), Bytes::new(), 0, BTreeMap::new()),
+                Account::new(U256::from(100_000_000_000_000_000_000u128), Bytes::new(), 0, BTreeMap::new()),
             ),
         ]);
         
@@ -61,7 +61,7 @@ impl EvmExecutor for EthrexExecutor {
             origin: Address::from_low_u64_be(SENDER_ADDRESS),
             tx_nonce: 0,
             gas_limit,
-            block_gas_limit: 30_000_000,
+            block_gas_limit: 1_000_000_000, // 1 billion gas limit for benchmarks
             ..Default::default()
         };
         
