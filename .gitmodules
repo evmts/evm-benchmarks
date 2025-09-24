@@ -1,0 +1,18 @@
+[submodule "guillotine"]
+	path = guillotine
+	url = https://github.com/evmts/guillotine
+[submodule "revm"]
+	path = revm
+	url = https://github.com/bluealloy/revm
+[submodule "geth"]
+	path = geth
+	url = https://github.com/ethereum/go-ethereum
+[submodule "ethrex"]
+	path = ethrex
+	url = https://github.com/lambdaclass/ethrex
+[submodule "ethereumjs"]
+	path = ethereumjs
+	url = https://github.com/ethereumjs/ethereumjs-monorepo
+[submodule "py-evm"]
+	path = py-evm
+	url = https://github.com/ethereum/py-evm
