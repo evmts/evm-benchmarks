@@ -35,6 +35,18 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
+    
+    // Build guillotine submodule first
+    const guillotine_build = b.addSystemCommand(&[_][]const u8{
+        "zig",
+        "build",
+        "-Doptimize=ReleaseFast",
+    });
+    guillotine_build.setCwd(b.path("guillotine"));
+    guillotine_build.step.name = "Build guillotine EVM";
+    
+    const guillotine_build_step = b.step("build-guillotine", "Build the guillotine EVM");
+    guillotine_build_step.dependOn(&guillotine_build.step);
     // It's also possible to define more custom flags to toggle optional features
     // of this build script using `b.option()`. All defined flags (including
     // target and optimize options) will be listed when running `zig build --help`
@@ -111,6 +123,29 @@ pub fn build(b: *std.Build) void {
     exe.root_module.addLibraryPath(b.path("guillotine/target/release"));
     exe.root_module.linkSystemLibrary("foundry_wrapper", .{});
     exe.linkLibC();
+    
+    // Build guillotine runner executable using C API
+    const guillotine_exe = b.addExecutable(.{
+        .name = "guillotine-runner",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/guillotine_runner_c.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "clap", .module = clap.module("clap") },
+            },
+        }),
+    });
+    
+    // Link with guillotine C API
+    guillotine_exe.addLibraryPath(b.path("guillotine/zig-out/lib"));
+    guillotine_exe.linkSystemLibrary("guillotine_ffi");
+    guillotine_exe.linkLibC();
+    
+    // Make sure guillotine is built first
+    guillotine_exe.step.dependOn(&guillotine_build.step);
+    
+    b.installArtifact(guillotine_exe);
     
     // This declares intent for the executable to be installed into the
     // install prefix when running `zig build` (i.e. when executing the default

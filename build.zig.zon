@@ -36,6 +36,9 @@
             .url = "git+https://github.com/Hejsil/zig-clap#b7e3348ed60f99ba32c75aa707ff7c87adc31b36",
             .hash = "clap-0.11.0-oBajB-TnAQC7yPLnZRT5WzHZ_4Ly4dX2OILskli74b9H",
         },
+        .guillotine = .{
+            .path = "guillotine",
+        },
     },
     .paths = .{
         "build.zig",
