@@ -11,6 +11,9 @@ const BenchmarkResult = struct {
     revm_mean: f64,
     ethrex_mean: f64,
     guillotine_mean: f64,
+    guillotine_bun_mean: f64,
+    guillotine_python_mean: f64,
+    guillotine_go_mean: f64,
 };
 
 fn checkHyperfine(allocator: std.mem.Allocator) !bool {
@@ -176,6 +179,24 @@ fn runBenchmarkWithResult(allocator: std.mem.Allocator, fixture_data: fixture.Fi
         try std.fmt.allocPrint(allocator, "./zig-out/bin/guillotine-runner --bytecode {s} --gas-limit {} --internal-runs {}", .{ bytecode, fixture_data.gas_limit, internal_runs });
     defer allocator.free(guillotine_cmd);
     
+    const guillotine_bun_cmd = if (fixture_data.calldata.len > 0 and !std.mem.eql(u8, fixture_data.calldata, ""))
+        try std.fmt.allocPrint(allocator, "bun src/guillotine_bun_runner.ts --bytecode {s} --calldata {s} --gas-limit {} --internal-runs {}", .{ bytecode, fixture_data.calldata, fixture_data.gas_limit, internal_runs })
+    else
+        try std.fmt.allocPrint(allocator, "bun src/guillotine_bun_runner.ts --bytecode {s} --gas-limit {} --internal-runs {}", .{ bytecode, fixture_data.gas_limit, internal_runs });
+    defer allocator.free(guillotine_bun_cmd);
+    
+    const guillotine_python_cmd = if (fixture_data.calldata.len > 0 and !std.mem.eql(u8, fixture_data.calldata, ""))
+        try std.fmt.allocPrint(allocator, "python3 src/guillotine_python_runner.py --bytecode {s} --calldata {s} --gas-limit {} --internal-runs {}", .{ bytecode, fixture_data.calldata, fixture_data.gas_limit, internal_runs })
+    else
+        try std.fmt.allocPrint(allocator, "python3 src/guillotine_python_runner.py --bytecode {s} --gas-limit {} --internal-runs {}", .{ bytecode, fixture_data.gas_limit, internal_runs });
+    defer allocator.free(guillotine_python_cmd);
+    
+    const guillotine_go_cmd = if (fixture_data.calldata.len > 0 and !std.mem.eql(u8, fixture_data.calldata, ""))
+        try std.fmt.allocPrint(allocator, "./zig-out/bin/guillotine-go-runner --bytecode {s} --calldata {s} --gas-limit {} --internal-runs {}", .{ bytecode, fixture_data.calldata, fixture_data.gas_limit, internal_runs })
+    else
+        try std.fmt.allocPrint(allocator, "./zig-out/bin/guillotine-go-runner --bytecode {s} --gas-limit {} --internal-runs {}", .{ bytecode, fixture_data.gas_limit, internal_runs });
+    defer allocator.free(guillotine_go_cmd);
+    
     // Run hyperfine quietly with JSON export
     const hyperfine_result = try std.process.Child.run(.{
         .allocator = allocator,
@@ -192,10 +213,22 @@ fn runBenchmarkWithResult(allocator: std.mem.Allocator, fixture_data: fixture.Fi
             ethrex_cmd,
             "-n", "guillotine",
             guillotine_cmd,
+            "-n", "guillotine-bun",
+            guillotine_bun_cmd,
+            "-n", "guillotine-python",
+            guillotine_python_cmd,
+            "-n", "guillotine-go",
+            guillotine_go_cmd,
         },
     });
     defer allocator.free(hyperfine_result.stdout);
     defer allocator.free(hyperfine_result.stderr);
+    
+    // Debug: print hyperfine stderr if not empty
+    if (hyperfine_result.stderr.len > 0) {
+        try writer.interface.print("Hyperfine stderr: {s}\n", .{hyperfine_result.stderr});
+        try writer.interface.flush();
+    }
     
     // Read and parse JSON - simple parsing for the mean values
     const json_content = try std.fs.cwd().readFileAlloc(allocator, tmp_json, 1024 * 1024);
@@ -206,6 +239,9 @@ fn runBenchmarkWithResult(allocator: std.mem.Allocator, fixture_data: fixture.Fi
     var revm_mean: f64 = 0;
     var ethrex_mean: f64 = 0; 
     var guillotine_mean: f64 = 0;
+    var guillotine_bun_mean: f64 = 0;
+    var guillotine_python_mean: f64 = 0;
+    var guillotine_go_mean: f64 = 0;
     
     // Find the results array
     if (std.mem.indexOf(u8, json_content, "\"results\":")) |results_start| {
@@ -233,10 +269,13 @@ fn runBenchmarkWithResult(allocator: std.mem.Allocator, fixture_data: fixture.Fi
             
             if (evm_index == 0) revm_mean = mean_ms
             else if (evm_index == 1) ethrex_mean = mean_ms
-            else if (evm_index == 2) guillotine_mean = mean_ms;
+            else if (evm_index == 2) guillotine_mean = mean_ms
+            else if (evm_index == 3) guillotine_bun_mean = mean_ms
+            else if (evm_index == 4) guillotine_python_mean = mean_ms
+            else if (evm_index == 5) guillotine_go_mean = mean_ms;
             
             evm_index += 1;
-            if (evm_index >= 3) break;
+            if (evm_index >= 6) break;
         }
     }
     
@@ -248,6 +287,9 @@ fn runBenchmarkWithResult(allocator: std.mem.Allocator, fixture_data: fixture.Fi
         .revm_mean = revm_mean,
         .ethrex_mean = ethrex_mean,
         .guillotine_mean = guillotine_mean,
+        .guillotine_bun_mean = guillotine_bun_mean,
+        .guillotine_python_mean = guillotine_python_mean,
+        .guillotine_go_mean = guillotine_go_mean,
     };
 }
 
@@ -263,8 +305,8 @@ fn generateResultsMarkdown(allocator: std.mem.Allocator, results: []const Benchm
     try file.writeAll(runs_note);
     
     try file.writeAll("## Performance Comparison\n\n");
-    try file.writeAll("| Benchmark | REVM (ms) | ethrex (ms) | Guillotine (ms) | Fastest |\n");
-    try file.writeAll("|-----------|-----------|-------------|-----------------|----------|\n");
+    try file.writeAll("| Benchmark | REVM (ms) | ethrex (ms) | Guillotine (ms) | Guillotine-Bun (ms) | Guillotine-Python (ms) | Guillotine-Go (ms) | Fastest |\n");
+    try file.writeAll("|-----------|-----------|-------------|-----------------|---------------------|------------------------|--------------------|---------|-\n");
     
     for (results) |res| {
         // Find fastest
@@ -276,13 +318,28 @@ fn generateResultsMarkdown(allocator: std.mem.Allocator, results: []const Benchm
         }
         if (res.guillotine_mean < fastest_time) {
             fastest = "Guillotine";
+            fastest_time = res.guillotine_mean;
+        }
+        if (res.guillotine_bun_mean < fastest_time) {
+            fastest = "Guillotine-Bun";
+            fastest_time = res.guillotine_bun_mean;
+        }
+        if (res.guillotine_python_mean < fastest_time) {
+            fastest = "Guillotine-Python";
+            fastest_time = res.guillotine_python_mean;
+        }
+        if (res.guillotine_go_mean < fastest_time) {
+            fastest = "Guillotine-Go";
         }
         
-        const row = try std.fmt.allocPrint(allocator, "| {s} | {d:.2} | {d:.2} | {d:.2} | {s} |\n", .{
+        const row = try std.fmt.allocPrint(allocator, "| {s} | {d:.2} | {d:.2} | {d:.2} | {d:.2} | {d:.2} | {d:.2} | {s} |\n", .{
             res.name,
             res.revm_mean,
             res.ethrex_mean,
             res.guillotine_mean,
+            res.guillotine_bun_mean,
+            res.guillotine_python_mean,
+            res.guillotine_go_mean,
             fastest,
         });
         defer allocator.free(row);
@@ -295,17 +352,23 @@ fn generateResultsMarkdown(allocator: std.mem.Allocator, results: []const Benchm
     var total_revm: f64 = 0;
     var total_ethrex: f64 = 0;
     var total_guillotine: f64 = 0;
+    var total_guillotine_bun: f64 = 0;
+    var total_guillotine_python: f64 = 0;
+    var total_guillotine_go: f64 = 0;
     
     for (results) |res| {
         total_revm += res.revm_mean;
         total_ethrex += res.ethrex_mean;
         total_guillotine += res.guillotine_mean;
+        total_guillotine_bun += res.guillotine_bun_mean;
+        total_guillotine_python += res.guillotine_python_mean;
+        total_guillotine_go += res.guillotine_go_mean;
     }
     
     const n = @as(f64, @floatFromInt(results.len));
     const summary = try std.fmt.allocPrint(allocator, 
-        "- **Average REVM time**: {d:.2} ms\n- **Average ethrex time**: {d:.2} ms\n- **Average Guillotine time**: {d:.2} ms\n", 
-        .{ total_revm / n, total_ethrex / n, total_guillotine / n }
+        "- **Average REVM time**: {d:.2} ms\n- **Average ethrex time**: {d:.2} ms\n- **Average Guillotine time**: {d:.2} ms\n- **Average Guillotine-Bun time**: {d:.2} ms\n- **Average Guillotine-Python time**: {d:.2} ms\n- **Average Guillotine-Go time**: {d:.2} ms\n", 
+        .{ total_revm / n, total_ethrex / n, total_guillotine / n, total_guillotine_bun / n, total_guillotine_python / n, total_guillotine_go / n }
     );
     defer allocator.free(summary);
     try file.writeAll(summary);
@@ -371,6 +434,48 @@ fn runBenchmarkForFixture(allocator: std.mem.Allocator, fixture_data: fixture.Fi
         );
     defer allocator.free(guillotine_cmd);
     
+    const guillotine_bun_cmd = if (fixture_data.calldata.len > 0 and !std.mem.eql(u8, fixture_data.calldata, ""))
+        try std.fmt.allocPrint(
+            allocator,
+            "bun src/guillotine_bun_runner.ts --bytecode {s} --calldata {s} --gas-limit {} --internal-runs {}",
+            .{ bytecode, fixture_data.calldata, fixture_data.gas_limit, internal_runs }
+        )
+    else
+        try std.fmt.allocPrint(
+            allocator,
+            "bun src/guillotine_bun_runner.ts --bytecode {s} --gas-limit {} --internal-runs {}",
+            .{ bytecode, fixture_data.gas_limit, internal_runs }
+        );
+    defer allocator.free(guillotine_bun_cmd);
+    
+    const guillotine_python_cmd = if (fixture_data.calldata.len > 0 and !std.mem.eql(u8, fixture_data.calldata, ""))
+        try std.fmt.allocPrint(
+            allocator,
+            "python3 src/guillotine_python_runner.py --bytecode {s} --calldata {s} --gas-limit {} --internal-runs {}",
+            .{ bytecode, fixture_data.calldata, fixture_data.gas_limit, internal_runs }
+        )
+    else
+        try std.fmt.allocPrint(
+            allocator,
+            "python3 src/guillotine_python_runner.py --bytecode {s} --gas-limit {} --internal-runs {}",
+            .{ bytecode, fixture_data.gas_limit, internal_runs }
+        );
+    defer allocator.free(guillotine_python_cmd);
+    
+    const guillotine_go_cmd = if (fixture_data.calldata.len > 0 and !std.mem.eql(u8, fixture_data.calldata, ""))
+        try std.fmt.allocPrint(
+            allocator,
+            "./zig-out/bin/guillotine-go-runner --bytecode {s} --calldata {s} --gas-limit {} --internal-runs {}",
+            .{ bytecode, fixture_data.calldata, fixture_data.gas_limit, internal_runs }
+        )
+    else
+        try std.fmt.allocPrint(
+            allocator,
+            "./zig-out/bin/guillotine-go-runner --bytecode {s} --gas-limit {} --internal-runs {}",
+            .{ bytecode, fixture_data.gas_limit, internal_runs }
+        );
+    defer allocator.free(guillotine_go_cmd);
+    
     // Build hyperfine command to compare implementations
     var hyperfine_args: std.ArrayList([]const u8) = .empty;
     hyperfine_args.ensureTotalCapacity(allocator, 20) catch unreachable;
@@ -398,6 +503,15 @@ fn runBenchmarkForFixture(allocator: std.mem.Allocator, fixture_data: fixture.Fi
     try hyperfine_args.append(allocator, "-n");
     try hyperfine_args.append(allocator, "guillotine");
     try hyperfine_args.append(allocator, guillotine_cmd);
+    try hyperfine_args.append(allocator, "-n");
+    try hyperfine_args.append(allocator, "guillotine-bun");
+    try hyperfine_args.append(allocator, guillotine_bun_cmd);
+    try hyperfine_args.append(allocator, "-n");
+    try hyperfine_args.append(allocator, "guillotine-python");
+    try hyperfine_args.append(allocator, guillotine_python_cmd);
+    try hyperfine_args.append(allocator, "-n");
+    try hyperfine_args.append(allocator, "guillotine-go");
+    try hyperfine_args.append(allocator, guillotine_go_cmd);
     
     // Execute hyperfine
     var child = std.process.Child.init(hyperfine_args.items, allocator);
