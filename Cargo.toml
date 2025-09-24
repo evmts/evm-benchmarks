@@ -1,5 +1,5 @@
 [package]
-name = "revm-runner"
+name = "evm-runner"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,7 +7,25 @@ edition = "2021"
 anyhow = "1.0"
 clap = { version = "4.5", features = ["derive"] }
 hex = "0.4"
+once_cell = "1.21"
+keccak-hash = "0.11"
 
 [dependencies.revm]
 path = "revm/crates/revm"
 features = ["std"]
+
+[dependencies.ethrex-levm]
+path = "ethrex/crates/vm/levm"
+default-features = false
+
+[dependencies.ethrex-common]
+path = "ethrex/crates/common"
+
+[dependencies.ethrex-blockchain]
+path = "ethrex/crates/blockchain"
+
+[dependencies.ethrex-storage]
+path = "ethrex/crates/storage"
+
+[dependencies.ethrex-vm]
+path = "ethrex/crates/vm"
