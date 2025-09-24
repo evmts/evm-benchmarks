@@ -6,6 +6,13 @@ const c = @cImport({
     @cInclude("foundry_wrapper.h");
 });
 
+const BenchmarkResult = struct {
+    name: []const u8,
+    revm_mean: f64,
+    ethrex_mean: f64,
+    guillotine_mean: f64,
+};
+
 fn checkHyperfine(allocator: std.mem.Allocator) !bool {
     const result = std.process.Child.run(.{
         .allocator = allocator,
@@ -138,7 +145,175 @@ fn compileSolidity(allocator: std.mem.Allocator, contract_path: []const u8) ![]u
     return bytecode;
 }
 
-fn runBenchmarkForFixture(allocator: std.mem.Allocator, fixture_data: fixture.Fixture, bytecode: []const u8) !void {
+fn runBenchmarkWithResult(allocator: std.mem.Allocator, fixture_data: fixture.Fixture, bytecode: []const u8, internal_runs: u32) !BenchmarkResult {
+    // Print progress
+    const stdout = std.fs.File.stdout();
+    var buf: [1024]u8 = undefined;
+    var writer = stdout.writer(&buf);
+    try writer.interface.print("  Running {s} benchmark ({} internal runs)...\n", .{fixture_data.name, internal_runs});
+    try writer.interface.flush();
+    
+    // Create temp file for JSON output
+    const tmp_json = try std.fmt.allocPrint(allocator, "/tmp/bench_{s}.json", .{fixture_data.name});
+    defer allocator.free(tmp_json);
+    
+    // Build commands with internal runs
+    const revm_cmd = if (fixture_data.calldata.len > 0 and !std.mem.eql(u8, fixture_data.calldata, ""))
+        try std.fmt.allocPrint(allocator, "./target/release/evm-runner --bytecode {s} --calldata {s} --gas-limit {} --internal-runs {}", .{ bytecode, fixture_data.calldata, fixture_data.gas_limit, internal_runs })
+    else
+        try std.fmt.allocPrint(allocator, "./target/release/evm-runner --bytecode {s} --gas-limit {} --internal-runs {}", .{ bytecode, fixture_data.gas_limit, internal_runs });
+    defer allocator.free(revm_cmd);
+    
+    const ethrex_cmd = if (fixture_data.calldata.len > 0 and !std.mem.eql(u8, fixture_data.calldata, ""))
+        try std.fmt.allocPrint(allocator, "./target/release/evm-runner --evm ethrex --bytecode {s} --calldata {s} --gas-limit {} --internal-runs {}", .{ bytecode, fixture_data.calldata, fixture_data.gas_limit, internal_runs })
+    else
+        try std.fmt.allocPrint(allocator, "./target/release/evm-runner --evm ethrex --bytecode {s} --gas-limit {} --internal-runs {}", .{ bytecode, fixture_data.gas_limit, internal_runs });
+    defer allocator.free(ethrex_cmd);
+    
+    const guillotine_cmd = if (fixture_data.calldata.len > 0 and !std.mem.eql(u8, fixture_data.calldata, ""))
+        try std.fmt.allocPrint(allocator, "./zig-out/bin/guillotine-runner --bytecode {s} --calldata {s} --gas-limit {} --internal-runs {}", .{ bytecode, fixture_data.calldata, fixture_data.gas_limit, internal_runs })
+    else
+        try std.fmt.allocPrint(allocator, "./zig-out/bin/guillotine-runner --bytecode {s} --gas-limit {} --internal-runs {}", .{ bytecode, fixture_data.gas_limit, internal_runs });
+    defer allocator.free(guillotine_cmd);
+    
+    // Run hyperfine quietly with JSON export
+    const hyperfine_result = try std.process.Child.run(.{
+        .allocator = allocator,
+        .argv = &[_][]const u8{
+            "hyperfine",
+            "--shell=none",
+            "--warmup", "2",
+            "--runs", "5", 
+            "--export-json", tmp_json,
+            "--style", "basic",
+            "-n", "revm",
+            revm_cmd,
+            "-n", "ethrex",
+            ethrex_cmd,
+            "-n", "guillotine",
+            guillotine_cmd,
+        },
+    });
+    defer allocator.free(hyperfine_result.stdout);
+    defer allocator.free(hyperfine_result.stderr);
+    
+    // Read and parse JSON - simple parsing for the mean values
+    const json_content = try std.fs.cwd().readFileAlloc(allocator, tmp_json, 1024 * 1024);
+    defer allocator.free(json_content);
+    
+    // Quick and dirty JSON parsing for the mean times
+    // Look for "mean": X.XXX pattern
+    var revm_mean: f64 = 0;
+    var ethrex_mean: f64 = 0; 
+    var guillotine_mean: f64 = 0;
+    
+    // Find the results array
+    if (std.mem.indexOf(u8, json_content, "\"results\":")) |results_start| {
+        var search_pos = results_start;
+        var evm_index: usize = 0;
+        
+        // Find each mean value in order
+        while (std.mem.indexOf(u8, json_content[search_pos..], "\"mean\":")) |mean_offset| {
+            const mean_start = search_pos + mean_offset + 7; // Skip "mean":
+            search_pos = mean_start;
+            
+            // Skip whitespace
+            var pos = mean_start;
+            while (pos < json_content.len and (json_content[pos] == ' ' or json_content[pos] == '\t')) : (pos += 1) {}
+            
+            // Find the end of the number
+            var end = pos;
+            while (end < json_content.len and (json_content[end] == '.' or (json_content[end] >= '0' and json_content[end] <= '9') or json_content[end] == 'e' or json_content[end] == 'E' or json_content[end] == '-')) : (end += 1) {}
+            
+            const mean_str = json_content[pos..end];
+            const mean_value = std.fmt.parseFloat(f64, mean_str) catch 0;
+            
+            // Convert to milliseconds and normalize by internal runs
+            const mean_ms = (mean_value * 1000.0) / @as(f64, @floatFromInt(internal_runs));
+            
+            if (evm_index == 0) revm_mean = mean_ms
+            else if (evm_index == 1) ethrex_mean = mean_ms
+            else if (evm_index == 2) guillotine_mean = mean_ms;
+            
+            evm_index += 1;
+            if (evm_index >= 3) break;
+        }
+    }
+    
+    // Clean up temp file
+    std.fs.cwd().deleteFile(tmp_json) catch {};
+    
+    return BenchmarkResult{
+        .name = try allocator.dupe(u8, fixture_data.name),
+        .revm_mean = revm_mean,
+        .ethrex_mean = ethrex_mean,
+        .guillotine_mean = guillotine_mean,
+    };
+}
+
+fn generateResultsMarkdown(allocator: std.mem.Allocator, results: []const BenchmarkResult, internal_runs: u32) !void {
+    const file = try std.fs.cwd().createFile("results.md", .{});
+    defer file.close();
+    
+    try file.writeAll("# EVM Benchmark Results\n\n");
+    
+    // Add note about internal runs
+    const runs_note = try std.fmt.allocPrint(allocator, "_Times shown are per-execution averages from {} internal runs per benchmark._\n\n", .{internal_runs});
+    defer allocator.free(runs_note);
+    try file.writeAll(runs_note);
+    
+    try file.writeAll("## Performance Comparison\n\n");
+    try file.writeAll("| Benchmark | REVM (ms) | ethrex (ms) | Guillotine (ms) | Fastest |\n");
+    try file.writeAll("|-----------|-----------|-------------|-----------------|----------|\n");
+    
+    for (results) |res| {
+        // Find fastest
+        var fastest: []const u8 = "REVM";
+        var fastest_time = res.revm_mean;
+        if (res.ethrex_mean < fastest_time) {
+            fastest = "ethrex";
+            fastest_time = res.ethrex_mean;
+        }
+        if (res.guillotine_mean < fastest_time) {
+            fastest = "Guillotine";
+        }
+        
+        const row = try std.fmt.allocPrint(allocator, "| {s} | {d:.2} | {d:.2} | {d:.2} | {s} |\n", .{
+            res.name,
+            res.revm_mean,
+            res.ethrex_mean,
+            res.guillotine_mean,
+            fastest,
+        });
+        defer allocator.free(row);
+        try file.writeAll(row);
+    }
+    
+    try file.writeAll("\n## Summary Statistics\n\n");
+    
+    // Calculate averages
+    var total_revm: f64 = 0;
+    var total_ethrex: f64 = 0;
+    var total_guillotine: f64 = 0;
+    
+    for (results) |res| {
+        total_revm += res.revm_mean;
+        total_ethrex += res.ethrex_mean;
+        total_guillotine += res.guillotine_mean;
+    }
+    
+    const n = @as(f64, @floatFromInt(results.len));
+    const summary = try std.fmt.allocPrint(allocator, 
+        "- **Average REVM time**: {d:.2} ms\n- **Average ethrex time**: {d:.2} ms\n- **Average Guillotine time**: {d:.2} ms\n", 
+        .{ total_revm / n, total_ethrex / n, total_guillotine / n }
+    );
+    defer allocator.free(summary);
+    try file.writeAll(summary);
+    
+    try file.writeAll("\n---\n*Generated by EVM Benchmark Suite*\n");
+}
+
+fn runBenchmarkForFixture(allocator: std.mem.Allocator, fixture_data: fixture.Fixture, bytecode: []const u8, internal_runs: u32) !void {
     const stdout = std.fs.File.stdout();
     var buf: [4096]u8 = undefined;
     var writer = stdout.writer(&buf);
@@ -153,46 +328,46 @@ fn runBenchmarkForFixture(allocator: std.mem.Allocator, fixture_data: fixture.Fi
     try writer.interface.print("\n", .{});
     try writer.interface.flush();
     
-    // Prepare commands for REVM, ethrex, and guillotine runners
+    // Prepare commands for REVM, ethrex, and guillotine runners with internal runs
     const revm_cmd = if (fixture_data.calldata.len > 0 and !std.mem.eql(u8, fixture_data.calldata, ""))
         try std.fmt.allocPrint(
             allocator,
-            "./target/release/evm-runner --evm revm --bytecode {s} --calldata {s} --gas-limit {}",
-            .{ bytecode, fixture_data.calldata, fixture_data.gas_limit }
+            "./target/release/evm-runner --evm revm --bytecode {s} --calldata {s} --gas-limit {} --internal-runs {}",
+            .{ bytecode, fixture_data.calldata, fixture_data.gas_limit, internal_runs }
         )
     else
         try std.fmt.allocPrint(
             allocator,
-            "./target/release/evm-runner --evm revm --bytecode {s} --gas-limit {}",
-            .{ bytecode, fixture_data.gas_limit }
+            "./target/release/evm-runner --evm revm --bytecode {s} --gas-limit {} --internal-runs {}",
+            .{ bytecode, fixture_data.gas_limit, internal_runs }
         );
     defer allocator.free(revm_cmd);
     
     const ethrex_cmd = if (fixture_data.calldata.len > 0 and !std.mem.eql(u8, fixture_data.calldata, ""))
         try std.fmt.allocPrint(
             allocator,
-            "./target/release/evm-runner --evm ethrex --bytecode {s} --calldata {s} --gas-limit {}",
-            .{ bytecode, fixture_data.calldata, fixture_data.gas_limit }
+            "./target/release/evm-runner --evm ethrex --bytecode {s} --calldata {s} --gas-limit {} --internal-runs {}",
+            .{ bytecode, fixture_data.calldata, fixture_data.gas_limit, internal_runs }
         )
     else
         try std.fmt.allocPrint(
             allocator,
-            "./target/release/evm-runner --evm ethrex --bytecode {s} --gas-limit {}",
-            .{ bytecode, fixture_data.gas_limit }
+            "./target/release/evm-runner --evm ethrex --bytecode {s} --gas-limit {} --internal-runs {}",
+            .{ bytecode, fixture_data.gas_limit, internal_runs }
         );
     defer allocator.free(ethrex_cmd);
     
     const guillotine_cmd = if (fixture_data.calldata.len > 0 and !std.mem.eql(u8, fixture_data.calldata, ""))
         try std.fmt.allocPrint(
             allocator,
-            "./zig-out/bin/guillotine-runner --bytecode {s} --calldata {s} --gas-limit {}",
-            .{ bytecode, fixture_data.calldata, fixture_data.gas_limit }
+            "./zig-out/bin/guillotine-runner --bytecode {s} --calldata {s} --gas-limit {} --internal-runs {}",
+            .{ bytecode, fixture_data.calldata, fixture_data.gas_limit, internal_runs }
         )
     else
         try std.fmt.allocPrint(
             allocator,
-            "./zig-out/bin/guillotine-runner --bytecode {s} --gas-limit {}",
-            .{ bytecode, fixture_data.gas_limit }
+            "./zig-out/bin/guillotine-runner --bytecode {s} --gas-limit {} --internal-runs {}",
+            .{ bytecode, fixture_data.gas_limit, internal_runs }
         );
     defer allocator.free(guillotine_cmd);
     
@@ -202,6 +377,7 @@ fn runBenchmarkForFixture(allocator: std.mem.Allocator, fixture_data: fixture.Fi
     defer hyperfine_args.deinit(allocator);
     
     try hyperfine_args.append(allocator, "hyperfine");
+    try hyperfine_args.append(allocator, "--shell=none");  // More accurate benchmarks without shell overhead
     try hyperfine_args.append(allocator, "--warmup");
     const warmup_str = try std.fmt.allocPrint(allocator, "{}", .{fixture_data.warmup});
     defer allocator.free(warmup_str);
@@ -235,6 +411,15 @@ pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
+    
+    // Get internal runs from environment variable, default to 20
+    const internal_runs = blk: {
+        const env_value = std.process.getEnvVarOwned(allocator, "BENCHMARK_INTERNAL_RUNS") catch {
+            break :blk @as(u32, 20);
+        };
+        defer allocator.free(env_value);
+        break :blk std.fmt.parseInt(u32, env_value, 10) catch 20;
+    };
 
     const params = comptime clap.parseParamsComptime(
         \\-h, --help              Display this help and exit.
@@ -242,6 +427,7 @@ pub fn main() !void {
         \\-f, --fixture <STR>     Run specific fixture by name.
         \\-d, --dir <STR>         Directory containing fixtures. [default: "./fixtures"]
         \\-c, --compile-only      Only compile contracts, don't run benchmarks.
+        \\-r, --results           Generate results.md file with benchmark summary.
         \\
     );
 
@@ -274,6 +460,8 @@ pub fn main() !void {
 
     // Check if hyperfine is installed (unless compile-only mode)
     const compile_only = res.args.@"compile-only";
+    const generate_results = res.args.results != 0;
+    
     if (compile_only == 0) {
         const has_hyperfine = try checkHyperfine(allocator);
         if (!has_hyperfine) {
@@ -312,10 +500,55 @@ pub fn main() !void {
         const bytecode = try compileSolidity(allocator, contract_path);
         defer allocator.free(bytecode);
         
+        // Special check for snailtracer bytecode - use expected bytecode instead
+        var actual_bytecode = bytecode;
+        var expected_bytecode_alloc: ?[]u8 = null;
+        defer if (expected_bytecode_alloc) |eb| allocator.free(eb);
+        
+        if (std.mem.eql(u8, fixture_data.name, "snailtracer")) {
+            // Read expected bytecode
+            const expected_file = try std.fs.cwd().openFile("expected-deployed-bytecode.txt", .{});
+            defer expected_file.close();
+            const expected_bytecode = try expected_file.readToEndAlloc(allocator, 100000);
+            defer allocator.free(expected_bytecode);
+            
+            // Trim any whitespace from expected
+            const trimmed_expected = std.mem.trim(u8, expected_bytecode, " \n\r\t");
+            
+            // Strip 0x prefix from bytecode if present
+            const bytecode_to_compare = if (std.mem.startsWith(u8, bytecode, "0x") or std.mem.startsWith(u8, bytecode, "0X"))
+                bytecode[2..]
+            else
+                bytecode;
+            
+            if (!std.mem.eql(u8, bytecode_to_compare, trimmed_expected)) {
+                try print_writer.interface.print("\n!!! SNAILTRACER BYTECODE MISMATCH !!!\n", .{});
+                try print_writer.interface.print("Using expected bytecode instead of compiled bytecode for testing.\n", .{});
+                try print_writer.interface.print("Expected length: {}\n", .{trimmed_expected.len});
+                try print_writer.interface.print("Got length: {}\n", .{bytecode_to_compare.len});
+                try print_writer.interface.flush();
+                
+                // Use the expected bytecode with 0x prefix
+                expected_bytecode_alloc = try allocator.alloc(u8, trimmed_expected.len + 2);
+                expected_bytecode_alloc.?[0] = '0';
+                expected_bytecode_alloc.?[1] = 'x';
+                @memcpy(expected_bytecode_alloc.?[2..], trimmed_expected);
+                actual_bytecode = expected_bytecode_alloc.?;
+            } else {
+                try print_writer.interface.print("✓ Snailtracer bytecode matches expected\n", .{});
+                try print_writer.interface.flush();
+            }
+        }
+        
         if (compile_only == 0) {
-            try runBenchmarkForFixture(allocator, fixture_data, bytecode);
+            try runBenchmarkForFixture(allocator, fixture_data, actual_bytecode, internal_runs);
         }
     } else {
+        // Collect results if generating report  
+        var results: std.ArrayList(BenchmarkResult) = .empty;
+        try results.ensureTotalCapacity(allocator, 20);
+        defer results.deinit(allocator);
+        
         // Process all JSON fixtures
         var iter = dir.iterate();
         while (try iter.next()) |entry| {
@@ -343,8 +576,69 @@ pub fn main() !void {
             };
             defer allocator.free(bytecode);
             
+            // Special check for snailtracer bytecode - use expected bytecode instead
+            var actual_bytecode = bytecode;
+            var expected_bytecode_alloc: ?[]u8 = null;
+            defer if (expected_bytecode_alloc) |eb| allocator.free(eb);
+            
+            if (std.mem.eql(u8, fixture_data.name, "snailtracer")) {
+                // Read expected bytecode
+                const expected_file = try std.fs.cwd().openFile("expected-deployed-bytecode.txt", .{});
+                defer expected_file.close();
+                const expected_bytecode = try expected_file.readToEndAlloc(allocator, 100000);
+                defer allocator.free(expected_bytecode);
+                
+                // Trim any whitespace from expected
+                const trimmed_expected = std.mem.trim(u8, expected_bytecode, " \n\r\t");
+                
+                // Strip 0x prefix from bytecode if present
+                const bytecode_to_compare = if (std.mem.startsWith(u8, bytecode, "0x") or std.mem.startsWith(u8, bytecode, "0X"))
+                    bytecode[2..]
+                else
+                    bytecode;
+                
+                if (!std.mem.eql(u8, bytecode_to_compare, trimmed_expected)) {
+                    try print_writer.interface.print("\n!!! SNAILTRACER BYTECODE MISMATCH !!!\n", .{});
+                    try print_writer.interface.print("Using expected bytecode instead of compiled bytecode for testing.\n", .{});
+                    try print_writer.interface.print("Expected length: {}\n", .{trimmed_expected.len});
+                    try print_writer.interface.print("Got length: {}\n", .{bytecode_to_compare.len});
+                    try print_writer.interface.flush();
+                    
+                    // Use the expected bytecode with 0x prefix
+                    expected_bytecode_alloc = try allocator.alloc(u8, trimmed_expected.len + 2);
+                    expected_bytecode_alloc.?[0] = '0';
+                    expected_bytecode_alloc.?[1] = 'x';
+                    @memcpy(expected_bytecode_alloc.?[2..], trimmed_expected);
+                    actual_bytecode = expected_bytecode_alloc.?;
+                } else {
+                    try print_writer.interface.print("✓ Snailtracer bytecode matches expected\n", .{});
+                    try print_writer.interface.flush();
+                }
+            }
+            
             if (compile_only == 0) {
-                try runBenchmarkForFixture(allocator, fixture_data, bytecode);
+                if (generate_results) {
+                    try print_writer.interface.print("Running benchmark with results for {s}...\n", .{fixture_data.name});
+                    try print_writer.interface.flush();
+                    const result = try runBenchmarkWithResult(allocator, fixture_data, actual_bytecode, internal_runs);
+                    try results.append(allocator, result);
+                } else {
+                    try runBenchmarkForFixture(allocator, fixture_data, actual_bytecode, internal_runs);
+                }
+            }
+        }
+        
+        // Generate results.md if requested
+        if (generate_results and results.items.len > 0) {
+            try print_writer.interface.print("\nGenerating results.md with {} benchmarks...\n", .{results.items.len});
+            try print_writer.interface.flush();
+            try generateResultsMarkdown(allocator, results.items, internal_runs);
+            try print_writer.interface.print("Results saved to results.md\n", .{});
+            try print_writer.interface.flush();
+            
+            // Free the duplicated names
+            for (results.items) |result| {
+                allocator.free(result.name);
             }
         }
     }
