@@ -53,16 +53,13 @@ fn compileSolidity(allocator: std.mem.Allocator, contract_path: []const u8) ![]u
     try writer.interface.print("Compiling {s} with guillotine compiler...\n", .{contract_path});
     try writer.interface.flush();
     
-    // Read the contract source
-    const source = try std.fs.cwd().readFileAlloc(allocator, contract_path, 10 * 1024 * 1024);
-    defer allocator.free(source);
+    // Get absolute path for proper import resolution
+    var abs_path_buf: [std.fs.max_path_bytes]u8 = undefined;
+    const abs_path = try std.fs.cwd().realpath(contract_path, &abs_path_buf);
     
-    // Convert to C strings
-    const source_name_c = try allocator.dupeZ(u8, std.fs.path.basename(contract_path));
-    defer allocator.free(source_name_c);
-    
-    const source_content_c = try allocator.dupeZ(u8, source);
-    defer allocator.free(source_content_c);
+    // Convert path to C string
+    const contract_path_c = try allocator.dupeZ(u8, abs_path);
+    defer allocator.free(contract_path_c);
     
     // Set up compiler settings
     var settings = c.foundry_CompilerSettings{
@@ -82,9 +79,8 @@ fn compileSolidity(allocator: std.mem.Allocator, contract_path: []const u8) ![]u
     var result_ptr: ?*c.foundry_CompilationResult = null;
     var error_ptr: ?*c.foundry_FoundryError = null;
     
-    const success = c.foundry_compile_source(
-        source_name_c.ptr,
-        source_content_c.ptr,
+    const success = c.foundry_compile_file(
+        contract_path_c.ptr,
         &settings,
         &result_ptr,
         &error_ptr,
@@ -114,7 +110,16 @@ fn compileSolidity(allocator: std.mem.Allocator, contract_path: []const u8) ![]u
     }
     
     const first_contract = result_ptr.?.contracts[0];
-    const bytecode_c = first_contract.bytecode;
+    
+    // Use deployed_bytecode for contract execution (runtime code)
+    // This is the code that actually runs after the contract is deployed
+    const bytecode_c = first_contract.deployed_bytecode;
+    
+    if (bytecode_c == null) {
+        try writer.interface.print("No deployed bytecode found\n", .{});
+        try writer.interface.flush();
+        return error.NoDeployedBytecode;
+    }
     
     // Convert C string to Zig string and make a copy
     const bytecode_slice = std.mem.span(bytecode_c);
@@ -148,24 +153,52 @@ fn runBenchmarkForFixture(allocator: std.mem.Allocator, fixture_data: fixture.Fi
     try writer.interface.print("\n", .{});
     try writer.interface.flush();
     
-    // Prepare command for REVM runner
+    // Prepare commands for REVM, ethrex, and guillotine runners
     const revm_cmd = if (fixture_data.calldata.len > 0 and !std.mem.eql(u8, fixture_data.calldata, ""))
         try std.fmt.allocPrint(
             allocator,
-            "./target/release/revm-runner --bytecode {s} --calldata {s} --gas-limit {}",
+            "./target/release/evm-runner --evm revm --bytecode {s} --calldata {s} --gas-limit {}",
             .{ bytecode, fixture_data.calldata, fixture_data.gas_limit }
         )
     else
         try std.fmt.allocPrint(
             allocator,
-            "./target/release/revm-runner --bytecode {s} --gas-limit {}",
+            "./target/release/evm-runner --evm revm --bytecode {s} --gas-limit {}",
             .{ bytecode, fixture_data.gas_limit }
         );
     defer allocator.free(revm_cmd);
     
-    // Build hyperfine command
+    const ethrex_cmd = if (fixture_data.calldata.len > 0 and !std.mem.eql(u8, fixture_data.calldata, ""))
+        try std.fmt.allocPrint(
+            allocator,
+            "./target/release/evm-runner --evm ethrex --bytecode {s} --calldata {s} --gas-limit {}",
+            .{ bytecode, fixture_data.calldata, fixture_data.gas_limit }
+        )
+    else
+        try std.fmt.allocPrint(
+            allocator,
+            "./target/release/evm-runner --evm ethrex --bytecode {s} --gas-limit {}",
+            .{ bytecode, fixture_data.gas_limit }
+        );
+    defer allocator.free(ethrex_cmd);
+    
+    const guillotine_cmd = if (fixture_data.calldata.len > 0 and !std.mem.eql(u8, fixture_data.calldata, ""))
+        try std.fmt.allocPrint(
+            allocator,
+            "./zig-out/bin/guillotine-runner --bytecode {s} --calldata {s} --gas-limit {}",
+            .{ bytecode, fixture_data.calldata, fixture_data.gas_limit }
+        )
+    else
+        try std.fmt.allocPrint(
+            allocator,
+            "./zig-out/bin/guillotine-runner --bytecode {s} --gas-limit {}",
+            .{ bytecode, fixture_data.gas_limit }
+        );
+    defer allocator.free(guillotine_cmd);
+    
+    // Build hyperfine command to compare implementations
     var hyperfine_args: std.ArrayList([]const u8) = .empty;
-    hyperfine_args.ensureTotalCapacity(allocator, 10) catch unreachable;
+    hyperfine_args.ensureTotalCapacity(allocator, 20) catch unreachable;
     defer hyperfine_args.deinit(allocator);
     
     try hyperfine_args.append(allocator, "hyperfine");
@@ -180,7 +213,15 @@ fn runBenchmarkForFixture(allocator: std.mem.Allocator, fixture_data: fixture.Fi
     try hyperfine_args.append(allocator, runs_str);
     
     try hyperfine_args.append(allocator, "--show-output");
+    try hyperfine_args.append(allocator, "-n");
+    try hyperfine_args.append(allocator, "revm");
     try hyperfine_args.append(allocator, revm_cmd);
+    try hyperfine_args.append(allocator, "-n");
+    try hyperfine_args.append(allocator, "ethrex");
+    try hyperfine_args.append(allocator, ethrex_cmd);
+    try hyperfine_args.append(allocator, "-n");
+    try hyperfine_args.append(allocator, "guillotine");
+    try hyperfine_args.append(allocator, guillotine_cmd);
     
     // Execute hyperfine
     var child = std.process.Child.init(hyperfine_args.items, allocator);
