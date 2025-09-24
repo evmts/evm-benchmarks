@@ -1,10 +1,12 @@
 mod evm;
 mod revm_executor;
+mod ethrex_executor;
 
 use anyhow::Result;
 use clap::Parser;
 use hex;
 use revm_executor::RevmExecutor;
+use ethrex_executor::EthrexExecutor;
 use evm::EvmExecutor;
 
 #[derive(Parser, Debug)]
@@ -21,6 +23,10 @@ struct Args {
     /// Gas limit for execution
     #[arg(short, long, default_value_t = 30_000_000)]
     gas_limit: u64,
+
+    /// EVM implementation to use (revm or ethrex)
+    #[arg(short = 'e', long, default_value = "revm")]
+    evm: String,
 }
 
 fn decode_hex(s: &str) -> Result<Vec<u8>> {
@@ -39,8 +45,14 @@ fn main() -> Result<()> {
     let bytecode = decode_hex(&args.bytecode)?;
     let calldata = decode_hex(&args.calldata)?;
 
-    // Create and use REVM executor
-    let mut executor = RevmExecutor::new()?;
+    // Create executor based on choice
+    let mut executor: Box<dyn EvmExecutor> = match args.evm.as_str() {
+        "revm" => Box::new(RevmExecutor::new()?),
+        "ethrex" => Box::new(EthrexExecutor::new()?),
+        _ => {
+            return Err(anyhow::anyhow!("Unknown EVM implementation: {}. Use 'revm' or 'ethrex'.", args.evm));
+        }
+    };
     
     println!("Executing with {}...", executor.name());
     println!("Bytecode: {} bytes", bytecode.len());
