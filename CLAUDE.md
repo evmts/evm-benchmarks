@@ -1,5 +1,23 @@
 # EVM Benchmark Suite
 
+## CRITICAL: BENCHMARK INTEGRITY
+
+**ABSOLUTELY NO PLACEHOLDERS OR FAKE DATA ARE ACCEPTABLE IN BENCHMARKS**
+
+Benchmarks MUST use real, measured data. Any placeholder values, hardcoded results, or fake timing data completely destroys the integrity and trustworthiness of the entire benchmark suite. 
+
+**NEVER**:
+- Use placeholder timing values
+- Hardcode benchmark results
+- Return fake data "for testing"
+- Implement "temporary" solutions with made-up values
+
+**ALWAYS**:
+- Use actual measured performance data
+- Parse real benchmark output
+- Fail loudly if real data cannot be obtained
+- Maintain complete integrity in all measurements
+
 ## Project Overview
 
 This project is a comprehensive EVM (Ethereum Virtual Machine) benchmark suite that tests various EVM implementations across different languages. It uses a Zig-based harness to compile Solidity contracts and benchmark their execution using different EVM backends.
@@ -50,20 +68,17 @@ zig build -Dskip-cargo
 ## Running Benchmarks
 
 ```bash
-# Run all benchmarks
-./zig-out/bin/bench
+# Run all benchmarks (recommended)
+./run.sh
 
-# Run a specific benchmark fixture
-./zig-out/bin/bench -f bubblesort
+# Or using Zig directly
+zig build benchmark
+
+# Run a specific benchmark
+zig build run -- -f bubblesort
 
 # Compile contracts only (no benchmarking)
-./zig-out/bin/bench -c
-
-# Use a different fixtures directory
-./zig-out/bin/bench -d ./my-fixtures
-
-# Get help
-./zig-out/bin/bench --help
+zig build run -- -c
 ```
 
 ## Fixture Format
