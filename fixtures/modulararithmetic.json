@@ -1,0 +1,9 @@
+{
+  "name": "modulararithmetic",
+  "num_runs": 5,
+  "solc_version": "0.8.20",
+  "contract": "ModularArithmetic.sol",
+  "calldata": "0x8903c5a2",
+  "warmup": 2,
+  "gas_limit": 30000000
+}
