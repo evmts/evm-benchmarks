@@ -45,6 +45,32 @@ pub fn build(b: *std.Build) void {
     
     const guillotine_build_step = b.step("build-guillotine", "Build the guillotine EVM");
     guillotine_build_step.dependOn(&guillotine_build.step);
+    
+    // Build guillotine Bun SDK
+    const guillotine_bun_build = b.addSystemCommand(&[_][]const u8{
+        "bash",
+        "./build.sh",
+    });
+    guillotine_bun_build.setCwd(b.path("guillotine/sdks/bun"));
+    guillotine_bun_build.step.name = "Build guillotine Bun SDK";
+    guillotine_bun_build.step.dependOn(&guillotine_build.step); // Needs guillotine built first
+    
+    const guillotine_bun_build_step = b.step("build-guillotine-bun", "Build the guillotine Bun SDK");
+    guillotine_bun_build_step.dependOn(&guillotine_bun_build.step);
+    
+    // Build Go runner executable
+    const go_build = b.addSystemCommand(&[_][]const u8{
+        "go",
+        "build",
+        "-o", "zig-out/bin/guillotine-go-runner",
+        "src/guillotine_go_runner.go",
+    });
+    go_build.setCwd(b.path("."));
+    go_build.step.name = "Build Go runner";
+    
+    const go_build_step = b.step("build-go", "Build the Go runner");
+    go_build_step.dependOn(&go_build.step);
+    
     // It's also possible to define more custom flags to toggle optional features
     // of this build script using `b.option()`. All defined flags (including
     // target and optimize options) will be listed when running `zig build --help`
@@ -113,8 +139,10 @@ pub fn build(b: *std.Build) void {
         }),
     });
 
-    // Make the executable depend on the Cargo build
+    // Make the executable depend on the Cargo build, Bun SDK, and Go build
     exe.step.dependOn(&cargo_build.step);
+    exe.step.dependOn(&guillotine_bun_build.step);
+    exe.step.dependOn(&go_build.step);
     
     // Link with guillotine foundry compiler
     exe.root_module.addIncludePath(b.path("guillotine/lib/foundry-compilers"));
@@ -123,6 +151,109 @@ pub fn build(b: *std.Build) void {
     exe.linkLibC();
     
     // Build guillotine runner executable using C API
+    // Build blst library (from guillotine's c-kzg-4844 submodule)
+    const blst_build_cmd = b.addSystemCommand(&.{
+        "sh", "-c", "cd guillotine/lib/c-kzg-4844/blst && ./build.sh",
+    });
+    
+    const blst_lib = b.addLibrary(.{
+        .name = "blst",
+        .linkage = .static,
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+        }),
+    });
+    blst_lib.linkLibC();
+    blst_lib.step.dependOn(&blst_build_cmd.step);
+    blst_lib.addCSourceFiles(.{
+        .files = &.{
+            "guillotine/lib/c-kzg-4844/blst/src/server.c",
+        },
+        .flags = &.{"-std=c99", "-D__BLST_PORTABLE__", "-fno-sanitize=undefined"},
+    });
+    blst_lib.addAssemblyFile(b.path("guillotine/lib/c-kzg-4844/blst/build/assembly.S"));
+    blst_lib.addIncludePath(b.path("guillotine/lib/c-kzg-4844/blst/bindings"));
+    
+    // Build c-kzg-4844 library
+    const c_kzg_lib = b.addLibrary(.{
+        .name = "c-kzg-4844",
+        .linkage = .static,
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+        }),
+    });
+    c_kzg_lib.linkLibC();
+    c_kzg_lib.linkLibrary(blst_lib);
+    c_kzg_lib.addCSourceFiles(.{
+        .files = &.{
+            "guillotine/lib/c-kzg-4844/src/ckzg.c",
+        },
+        .flags = &.{"-std=c99", "-fno-sanitize=undefined"},
+    });
+    c_kzg_lib.addIncludePath(b.path("guillotine/lib/c-kzg-4844/src"));
+    c_kzg_lib.addIncludePath(b.path("guillotine/lib/c-kzg-4844/blst/bindings"));
+    
+    // Create build options for guillotine
+    const build_options = b.addOptions();
+    build_options.addOption(bool, "enable_precompiles", false);
+    build_options.addOption(bool, "enable_bn254", false);
+    build_options.addOption(bool, "no_bn254", true);
+    build_options.addOption(bool, "no_precompiles", true);
+    build_options.addOption(bool, "enable_fusion", true);
+    build_options.addOption(bool, "enable_tracing", false);
+    build_options.addOption([]const u8, "evm_hardfork", "CANCUN");
+    build_options.addOption(bool, "disable_gas_checks", false);
+    const build_options_mod = build_options.createModule();
+    
+    // Create c_kzg module
+    const c_kzg_mod = b.createModule(.{
+        .root_source_file = b.path("guillotine/lib/c-kzg-4844/bindings/zig/root.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    c_kzg_mod.linkLibrary(c_kzg_lib);
+    c_kzg_mod.linkLibrary(blst_lib);
+    c_kzg_mod.addIncludePath(b.path("guillotine/lib/c-kzg-4844/src"));
+    c_kzg_mod.addIncludePath(b.path("guillotine/lib/c-kzg-4844/blst/bindings"));
+    
+    // Create primitives module
+    const primitives_mod = b.createModule(.{
+        .root_source_file = b.path("guillotine/src/primitives/root.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    
+    // Create crypto module
+    const crypto_mod = b.createModule(.{
+        .root_source_file = b.path("guillotine/src/crypto/root.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    crypto_mod.addImport("primitives", primitives_mod);
+    crypto_mod.addImport("c_kzg", c_kzg_mod);
+    crypto_mod.addImport("build_options", build_options_mod);
+    
+    // Primitives needs crypto for circular dependency
+    primitives_mod.addImport("crypto", crypto_mod);
+    
+    // Create main guillotine module
+    const guillotine_mod = b.createModule(.{
+        .root_source_file = b.path("guillotine/src/root.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    guillotine_mod.addImport("primitives", primitives_mod);
+    guillotine_mod.addImport("crypto", crypto_mod);
+    guillotine_mod.addImport("build_options", build_options_mod);
+    guillotine_mod.addImport("c_kzg", c_kzg_mod);
+    
+    // Create zbench module dependency
+    const zbench_dep = b.dependency("zbench", .{ .target = target, .optimize = optimize });
+    guillotine_mod.addImport("zbench", zbench_dep.module("zbench"));
+    
+    // Build the guillotine runner executable
     const guillotine_exe = b.addExecutable(.{
         .name = "guillotine-runner",
         .root_module = b.createModule(.{
@@ -130,14 +261,16 @@ pub fn build(b: *std.Build) void {
             .target = target,
             .optimize = optimize,
             .imports = &.{
-                .{ .name = "clap", .module = clap.module("clap") },
+                .{ .name = "guillotine", .module = guillotine_mod },
+                .{ .name = "primitives", .module = primitives_mod },
             },
         }),
+        .use_llvm = true, // Force LLVM for tail calls
     });
     
-    // Link with guillotine C API
-    guillotine_exe.addLibraryPath(b.path("guillotine/zig-out/lib"));
-    guillotine_exe.linkSystemLibrary("guillotine_ffi");
+    // Link libraries
+    guillotine_exe.linkLibrary(c_kzg_lib);
+    guillotine_exe.linkLibrary(blst_lib);
     guillotine_exe.linkLibC();
     
     // Make sure guillotine is built first

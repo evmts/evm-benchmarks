@@ -36,6 +36,10 @@
             .url = "git+https://github.com/Hejsil/zig-clap#b7e3348ed60f99ba32c75aa707ff7c87adc31b36",
             .hash = "clap-0.11.0-oBajB-TnAQC7yPLnZRT5WzHZ_4Ly4dX2OILskli74b9H",
         },
+        .zbench = .{
+            .url = "https://github.com/hendriknielaender/zBench/archive/refs/heads/main.tar.gz",
+            .hash = "zbench-0.11.2-YTdc7zolAQDlBF9i0ywXIvDjafL3Kg27S-aFUq6dU5zy",
+        },
         .guillotine = .{
             .path = "guillotine",
         },
