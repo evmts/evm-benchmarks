@@ -16,3 +16,6 @@
 [submodule "py-evm"]
 	path = py-evm
 	url = https://github.com/ethereum/py-evm
+[submodule "pyrevm"]
+	path = pyrevm
+	url = https://github.com/paradigmxyz/pyrevm.git
