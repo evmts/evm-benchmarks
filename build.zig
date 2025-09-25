@@ -13,19 +13,19 @@ pub fn build(b: *std.Build) void {
     // for restricting supported target set are available.
     const target = b.standardTargetOptions(.{});
     // Benchmarks must always use maximum performance optimization
-    const optimize = std.builtin.OptimizeMode.Debug;
+    const optimize = std.builtin.OptimizeMode.ReleaseFast;
 
-    // Add Cargo build step for REVM runner
+    // Add Cargo build step for Rust-based runners (REVM and Guillotine)
     const cargo_build = b.addSystemCommand(&[_][]const u8{
         "cargo",
         "build",
         "--release",
     });
     cargo_build.setCwd(b.path("."));
-    cargo_build.step.name = "Build REVM runner";
+    cargo_build.step.name = "Build Rust runners (REVM & Guillotine)";
 
     // Create a step that other steps can depend on
-    const cargo_build_step = b.step("revm", "Build the REVM runner");
+    const cargo_build_step = b.step("rust-runners", "Build the Rust-based EVM runners");
     cargo_build_step.dependOn(&cargo_build.step);
 
     // Add zig-clap dependency
@@ -38,7 +38,7 @@ pub fn build(b: *std.Build) void {
     const guillotine_build = b.addSystemCommand(&[_][]const u8{
         "zig",
         "build",
-        "-Doptimize=ReleaseFast",
+        "--release=fast",
     });
     guillotine_build.setCwd(b.path("guillotine"));
     guillotine_build.step.name = "Build guillotine EVM";
@@ -72,21 +72,38 @@ pub fn build(b: *std.Build) void {
     const go_build_step = b.step("build-go", "Build the Go runner");
     go_build_step.dependOn(&go_build.step);
 
-    // Build pyrevm Python package
-    const pyrevm_build = b.addSystemCommand(&[_][]const u8{
-        "pip",
-        "install",
-        "--user",
-        "--break-system-packages",
-        "-e",
-        "./pyrevm",
+    // Build Geth runner executable
+    const geth_runner_build = b.addSystemCommand(&[_][]const u8{
+        "go",
+        "build",
+        "-o", "zig-out/bin/geth-runner",
+        "src/geth_runner.go",
     });
-    pyrevm_build.setCwd(b.path("."));
-    pyrevm_build.step.name = "Install pyrevm Python package";
+    geth_runner_build.setCwd(b.path("."));
+    geth_runner_build.step.name = "Build Geth runner";
 
-    const pyrevm_build_step = b.step("build-pyrevm", "Build the pyrevm Python package");
-    pyrevm_build_step.dependOn(&pyrevm_build.step);
+    const geth_runner_build_step = b.step("build-geth-runner", "Build the Geth runner");
+    geth_runner_build_step.dependOn(&geth_runner_build.step);
 
+    // Build py-evm dependencies and copy runner
+    const py_evm_setup = b.addSystemCommand(&[_][]const u8{
+        "sh", "-c",
+        "mkdir -p zig-out/bin && pip3 install py-evm eth-utils && chmod +x src/py_evm_runner.py && cp src/py_evm_runner.py zig-out/bin/py-evm-runner",
+    });
+    py_evm_setup.step.name = "Setup py-evm runner";
+
+    const py_evm_setup_step = b.step("setup-py-evm", "Setup the py-evm runner");
+    py_evm_setup_step.dependOn(&py_evm_setup.step);
+
+    // Build ethereumjs dependencies and copy runner
+    const ethereumjs_setup = b.addSystemCommand(&[_][]const u8{
+        "sh", "-c",
+        "mkdir -p zig-out/bin && npm install @ethereumjs/vm @ethereumjs/common @ethereumjs/util @ethereumjs/statemanager && chmod +x src/ethereumjs_runner.js && cp src/ethereumjs_runner.js zig-out/bin/ethereumjs-runner",
+    });
+    ethereumjs_setup.step.name = "Setup ethereumjs runner";
+
+    const ethereumjs_setup_step = b.step("setup-ethereumjs", "Setup the ethereumjs runner");
+    ethereumjs_setup_step.dependOn(&ethereumjs_setup.step);
     // It's also possible to define more custom flags to toggle optional features
     // of this build script using `b.option()`. All defined flags (including
     // target and optimize options) will be listed when running `zig build --help`
@@ -155,12 +172,13 @@ pub fn build(b: *std.Build) void {
         }),
     });
 
-    // Make the executable depend on the Cargo build, Bun SDK, Go build, and pyrevm
+    // Make the executable depend on the Cargo build, Bun SDK, and all runner builds
     exe.step.dependOn(&cargo_build.step);
     exe.step.dependOn(&guillotine_bun_build.step);
     exe.step.dependOn(&go_build.step);
-    exe.step.dependOn(&pyrevm_build.step);
-
+    exe.step.dependOn(&geth_runner_build.step);
+    exe.step.dependOn(&py_evm_setup.step);
+    exe.step.dependOn(&ethereumjs_setup.step);
     // Link with guillotine foundry compiler
     exe.root_module.addIncludePath(b.path("guillotine/lib/foundry-compilers"));
     exe.root_module.addLibraryPath(b.path("guillotine/target/release"));
