@@ -8,8 +8,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/evmts/guillotine/sdks/go/evm"
-	"github.com/evmts/guillotine/sdks/go/primitives"
+	"bench/guillotine/sdks/go/evm"
+	"bench/guillotine/sdks/go/primitives"
 )
 
 func hexToBytes(hexStr string) ([]byte, error) {
@@ -25,11 +25,13 @@ func main() {
 	var calldataHex string
 	var gasLimit uint64
 	var internalRuns int
+	var measureStartup bool
 
 	flag.StringVar(&bytecodeHex, "bytecode", "", "Hex-encoded bytecode to execute")
 	flag.StringVar(&calldataHex, "calldata", "", "Hex-encoded calldata")
 	flag.Uint64Var(&gasLimit, "gas-limit", 30000000, "Gas limit for execution")
 	flag.IntVar(&internalRuns, "internal-runs", 1, "Number of internal runs")
+	flag.BoolVar(&measureStartup, "measure-startup", false, "Measure startup overhead only")
 	flag.Parse()
 
 	if bytecodeHex == "" {

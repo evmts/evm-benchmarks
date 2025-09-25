@@ -9,7 +9,7 @@ const { values } = parseArgs({
       type: "string",
     },
     calldata: {
-      type: "string", 
+      type: "string",
       default: "",
     },
     "gas-limit": {
@@ -19,6 +19,10 @@ const { values } = parseArgs({
     "internal-runs": {
       type: "string",
       default: "1",
+    },
+    "measure-startup": {
+      type: "boolean",
+      default: false,
     },
   },
 });

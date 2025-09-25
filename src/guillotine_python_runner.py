@@ -19,6 +19,7 @@ def main():
     parser.add_argument('--calldata', default='', help='Hex-encoded calldata')
     parser.add_argument('--gas-limit', type=int, default=30000000, help='Gas limit for execution')
     parser.add_argument('--internal-runs', type=int, default=1, help='Number of internal runs')
+    parser.add_argument('--measure-startup', action='store_true', help='Measure startup overhead only')
     
     args = parser.parse_args()
     

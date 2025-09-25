@@ -31,6 +31,10 @@ struct Args {
     /// Number of internal runs for benchmarking
     #[arg(short = 'i', long, default_value_t = 1)]
     internal_runs: u32,
+
+    /// Measure startup overhead only
+    #[arg(short = 'm', long)]
+    measure_startup: bool,
 }
 
 fn decode_hex(s: &str) -> Result<Vec<u8>> {
@@ -48,7 +52,6 @@ fn main() -> Result<()> {
     // Decode hex inputs
     let bytecode = decode_hex(&args.bytecode)?;
     let calldata = decode_hex(&args.calldata)?;
-    
     // Execute multiple internal runs
     for _ in 0..args.internal_runs {
         // Create executor inside loop for fresh state each run

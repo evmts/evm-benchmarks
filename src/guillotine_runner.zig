@@ -38,6 +38,7 @@ pub fn main() !void {
     var calldata_hex: []const u8 = "";
     var gas_limit: u64 = 30_000_000;
     var internal_runs: u64 = 1;
+    var measure_startup: bool = false;
 
     var i: usize = 1;
     while (i < args.len) : (i += 1) {
@@ -61,6 +62,8 @@ pub fn main() !void {
                 internal_runs = try std.fmt.parseInt(u64, args[i + 1], 10);
                 i += 1;
             }
+        } else if (std.mem.eql(u8, args[i], "--measure-startup")) {
+            measure_startup = true;
         }
     }
 
