@@ -1,0 +1,15 @@
+[package]
+name = "guillotine-rs"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0"
+
+[build-dependencies]
+bindgen = "0.69"
+cc = "1.0"
+
+[lib]
+name = "guillotine_rs"
+path = "src/lib.rs"
