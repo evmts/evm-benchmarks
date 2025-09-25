@@ -158,7 +158,7 @@ pub fn main() !void {
         };
 
         // Execute the call
-        const result = evm.simulate(call_params);
+        var result = evm.simulate(call_params);
         defer result.deinit(allocator);
     }
 }

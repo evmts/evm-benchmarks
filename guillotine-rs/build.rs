@@ -12,10 +12,10 @@ fn main() {
         .compile("stubs");
 
     // Build the path to the guillotine library
+    // Assume it was already built by the Zig build system
     let guillotine_lib_path = manifest_path
         .parent()
         .unwrap()
-        .join("evms")
         .join("guillotine")
         .join("zig-out")
         .join("lib");

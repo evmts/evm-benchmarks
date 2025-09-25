@@ -15,3 +15,8 @@ fi
 
 # Run the benchmark
 zig build benchmark
+
+# Serve the results with markserv
+echo ""
+echo "Starting markserv to display results..."
+bunx markserv ./results.md
