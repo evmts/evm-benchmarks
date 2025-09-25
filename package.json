@@ -8,5 +8,11 @@
   },
   "peerDependencies": {
     "typescript": "^5"
+  },
+  "dependencies": {
+    "@ethereumjs/common": "^10.0.0",
+    "@ethereumjs/statemanager": "^10.0.0",
+    "@ethereumjs/util": "^10.0.0",
+    "@ethereumjs/vm": "^10.0.0"
   }
 }
