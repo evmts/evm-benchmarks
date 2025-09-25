@@ -500,8 +500,8 @@ fn generateResultsMarkdown(allocator: std.mem.Allocator, results: []const Benchm
     try file.writeAll(runs_note);
 
     // Write table header
-    try file.writeAll("| Benchmark                        | Guillotine (ms) | REVM (ms)   | ethrex (ms) | Guillotine-Rust (ms) | Geth (ms)   | Guillotine-Go (ms) | Guillotine-Bun (ms) | Guillotine-Python (ms) | Fastest           |\n");
-    try file.writeAll("|----------------------------------|-----------------|-------------|-------------|----------------------|-------------|--------------------|---------------------|------------------------|-------------------|\n");
+    try file.writeAll("| Benchmark                        | Guillotine (ms) | REVM (ms)   | ethrex (ms) | Guillotine-Rust (ms) | Guillotine-Go (ms) | Guillotine-Bun (ms) | Guillotine-Python (ms) | Fastest           |\n");
+    try file.writeAll("|----------------------------------|-----------------|-------------|-------------|----------------------|--------------------|---------------------|------------------------|-------------------|\n");
 
     // Sort results with priority benchmarks first
     const sorted_results = try allocator.alloc(BenchmarkResult, results.len);
@@ -587,23 +587,19 @@ fn generateResultsMarkdown(allocator: std.mem.Allocator, results: []const Benchm
             fastest = "Guillotine-Go";
             fastest_time = res.guillotine_go_mean;
         }
-        if (res.geth_mean > 0 and res.geth_mean < fastest_time) {
-            fastest = "Geth";
-            fastest_time = res.geth_mean;
-        }
+        // Note: Geth is still benchmarked but excluded from results display
 
         // If no valid times found (all failed), mark as N/A
         if (fastest.len == 0) {
             fastest = "N/A";
         }
 
-        const row = try std.fmt.allocPrint(allocator, "| {s:32} | {d:>11.2} | {d:>11.2} | {d:>11.2} | {d:>11.2} | {d:>11.2} | {d:>11.2} | {d:>11.2} | {d:>11.2} | {s:17} |\n", .{
+        const row = try std.fmt.allocPrint(allocator, "| {s:32} | {d:>11.2} | {d:>11.2} | {d:>11.2} | {d:>11.2} | {d:>11.2} | {d:>11.2} | {d:>11.2} | {s:17} |\n", .{
             res.name,
             res.guillotine_mean,
             res.revm_mean,
             res.ethrex_mean,
             res.guillotine_rust_mean,
-            res.geth_mean,
             res.guillotine_go_mean,
             res.guillotine_bun_mean,
             res.guillotine_python_mean,
@@ -641,7 +637,6 @@ fn generateResultsMarkdown(allocator: std.mem.Allocator, results: []const Benchm
         "- REVM: {:.2}ms\n" ++
         "- ethrex: {:.2}ms\n" ++
         "- Guillotine Rust: {:.2}ms\n" ++
-        "- Geth: {:.2}ms\n" ++
         "- Guillotine Go: {:.2}ms\n" ++
         "- Guillotine Bun: {:.2}ms\n" ++
         "- Guillotine Python: {:.2}ms\n", .{
@@ -649,7 +644,6 @@ fn generateResultsMarkdown(allocator: std.mem.Allocator, results: []const Benchm
         total_revm / n,
         total_ethrex / n,
         total_guillotine_rust / n,
-        total_geth / n,
         total_guillotine_go / n,
         total_guillotine_bun / n,
         total_guillotine_python / n,
