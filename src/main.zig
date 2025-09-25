@@ -17,6 +17,19 @@ const BenchmarkResult = struct {
     guillotine_go_mean: f64,
 };
 
+const OverheadMeasurement = struct {
+    revm_overhead: f64,
+    ethrex_overhead: f64,
+    guillotine_overhead: f64,
+    guillotine_rust_overhead: f64,
+    guillotine_bun_overhead: f64,
+    guillotine_python_overhead: f64,
+    guillotine_go_overhead: f64,
+    geth_overhead: f64,
+    py_evm_overhead: f64,
+    ethereumjs_overhead: f64,
+};
+
 fn checkHyperfine(allocator: std.mem.Allocator) !bool {
     const result = std.process.Child.run(.{
         .allocator = allocator,
@@ -69,13 +82,12 @@ fn measureStartupOverhead(allocator: std.mem.Allocator, bytecode: []const u8) !O
 
     // Build commands with --measure-startup flag
     // Use minimal bytecode and calldata for overhead measurement
-    const minimal_calldata = "";
     const gas_limit: u64 = 30000000;
 
-    const revm_cmd = try std.fmt.allocPrint(allocator, "./target/release/evm-runner --bytecode {s} --gas-limit {} --measure-startup", .{ bytecode, gas_limit });
+    const revm_cmd = try std.fmt.allocPrint(allocator, "./target/release/revm_runner --bytecode {s} --gas-limit {} --measure-startup", .{ bytecode, gas_limit });
     defer allocator.free(revm_cmd);
 
-    const ethrex_cmd = try std.fmt.allocPrint(allocator, "./target/release/evm-runner --evm ethrex --bytecode {s} --gas-limit {} --measure-startup", .{ bytecode, gas_limit });
+    const ethrex_cmd = try std.fmt.allocPrint(allocator, "./target/release/revm_runner --evm ethrex --bytecode {s} --gas-limit {} --measure-startup", .{ bytecode, gas_limit });
     defer allocator.free(ethrex_cmd);
 
     const guillotine_cmd = try std.fmt.allocPrint(allocator, "./zig-out/bin/guillotine-runner --bytecode {s} --gas-limit {} --measure-startup", .{ bytecode, gas_limit });
@@ -297,7 +309,7 @@ fn compileSolidity(allocator: std.mem.Allocator, contract_path: []const u8) ![]u
     return bytecode;
 }
 
-fn runBenchmarkWithResult(allocator: std.mem.Allocator, fixture_data: fixture.Fixture, bytecode: []const u8, internal_runs: u32, overhead: ?OverheadMeasurement) !BenchmarkResult {
+fn runBenchmarkWithResult(allocator: std.mem.Allocator, fixture_data: fixture.Fixture, bytecode: []const u8, internal_runs: u32, _: ?OverheadMeasurement) !BenchmarkResult {
     // Print progress
     const stdout = std.fs.File.stdout();
     var buf: [1024]u8 = undefined;
@@ -311,15 +323,15 @@ fn runBenchmarkWithResult(allocator: std.mem.Allocator, fixture_data: fixture.Fi
 
     // Build commands with internal runs
     const revm_cmd = if (fixture_data.calldata.len > 0 and !std.mem.eql(u8, fixture_data.calldata, ""))
-        try std.fmt.allocPrint(allocator, "./target/release/evm-runner --bytecode {s} --calldata {s} --gas-limit {} --internal-runs {}", .{ bytecode, fixture_data.calldata, fixture_data.gas_limit, internal_runs })
+        try std.fmt.allocPrint(allocator, "./target/release/revm_runner --bytecode {s} --calldata {s} --gas-limit {} --internal-runs {}", .{ bytecode, fixture_data.calldata, fixture_data.gas_limit, internal_runs })
     else
-        try std.fmt.allocPrint(allocator, "./target/release/evm-runner --bytecode {s} --gas-limit {} --internal-runs {}", .{ bytecode, fixture_data.gas_limit, internal_runs });
+        try std.fmt.allocPrint(allocator, "./target/release/revm_runner --bytecode {s} --gas-limit {} --internal-runs {}", .{ bytecode, fixture_data.gas_limit, internal_runs });
     defer allocator.free(revm_cmd);
 
     const ethrex_cmd = if (fixture_data.calldata.len > 0 and !std.mem.eql(u8, fixture_data.calldata, ""))
-        try std.fmt.allocPrint(allocator, "./target/release/evm-runner --evm ethrex --bytecode {s} --calldata {s} --gas-limit {} --internal-runs {}", .{ bytecode, fixture_data.calldata, fixture_data.gas_limit, internal_runs })
+        try std.fmt.allocPrint(allocator, "./target/release/revm_runner --evm ethrex --bytecode {s} --calldata {s} --gas-limit {} --internal-runs {}", .{ bytecode, fixture_data.calldata, fixture_data.gas_limit, internal_runs })
     else
-        try std.fmt.allocPrint(allocator, "./target/release/evm-runner --evm ethrex --bytecode {s} --gas-limit {} --internal-runs {}", .{ bytecode, fixture_data.gas_limit, internal_runs });
+        try std.fmt.allocPrint(allocator, "./target/release/revm_runner --evm ethrex --bytecode {s} --gas-limit {} --internal-runs {}", .{ bytecode, fixture_data.gas_limit, internal_runs });
     defer allocator.free(ethrex_cmd);
 
     const guillotine_cmd = if (fixture_data.calldata.len > 0 and !std.mem.eql(u8, fixture_data.calldata, ""))
@@ -346,12 +358,28 @@ fn runBenchmarkWithResult(allocator: std.mem.Allocator, fixture_data: fixture.Fi
         try std.fmt.allocPrint(allocator, "./zig-out/bin/guillotine-go-runner --bytecode {s} --gas-limit {} --internal-runs {}", .{ bytecode, fixture_data.gas_limit, internal_runs });
     defer allocator.free(guillotine_go_cmd);
 
+    const guillotine_rust_cmd = if (fixture_data.calldata.len > 0 and !std.mem.eql(u8, fixture_data.calldata, ""))
+        try std.fmt.allocPrint(allocator, "./target/release/guillotine_runner {s} {s} {}", .{ bytecode, fixture_data.calldata, fixture_data.gas_limit })
+    else
+        try std.fmt.allocPrint(allocator, "./target/release/guillotine_runner {s} \"\" {}", .{ bytecode, fixture_data.gas_limit });
+    defer allocator.free(guillotine_rust_cmd);
+
     // Run hyperfine quietly with JSON export
     const hyperfine_result = try std.process.Child.run(.{
         .allocator = allocator,
         .argv = &[_][]const u8{
             "hyperfine",
             "--shell=none",
+            "--warmup",
+            try std.fmt.allocPrint(allocator, "{}", .{fixture_data.warmup}),
+            "--runs",
+            try std.fmt.allocPrint(allocator, "{}", .{fixture_data.num_runs}),
+            "--export-json",
+            tmp_json,
+            "--style",
+            "basic",
+            "-n",
+            "revm",
             revm_cmd,
             "-n",
             "ethrex",
@@ -359,6 +387,11 @@ fn runBenchmarkWithResult(allocator: std.mem.Allocator, fixture_data: fixture.Fi
             "-n",
             "guillotine",
             guillotine_cmd,
+            "-n",
+            "guillotine-rust",
+            guillotine_rust_cmd,
+            "-n",
+            "guillotine-bun",
             guillotine_bun_cmd,
             "-n",
             "guillotine-python",
@@ -411,6 +444,20 @@ fn runBenchmarkWithResult(allocator: std.mem.Allocator, fixture_data: fixture.Fi
             const mean_str = json_content[pos..end];
             const mean_value = std.fmt.parseFloat(f64, mean_str) catch 0;
 
+            // Convert to milliseconds for display
+            const mean_ms = mean_value * 1000.0;
+
+            // Assign based on evm_index
+            if (evm_index == 0) revm_mean = mean_ms
+            else if (evm_index == 1) ethrex_mean = mean_ms
+            else if (evm_index == 2) guillotine_mean = mean_ms
+            else if (evm_index == 3) guillotine_rust_mean = mean_ms
+            else if (evm_index == 4) guillotine_bun_mean = mean_ms
+            else if (evm_index == 5) guillotine_python_mean = mean_ms
+            else if (evm_index == 6) guillotine_go_mean = mean_ms;
+
+            evm_index += 1;
+            if (evm_index >= 7) break;
         }
     }
 
@@ -429,7 +476,7 @@ fn runBenchmarkWithResult(allocator: std.mem.Allocator, fixture_data: fixture.Fi
     };
 }
 
-fn generateResultsMarkdown(allocator: std.mem.Allocator, results: []const BenchmarkResult, raw_results: []const BenchmarkResult, internal_runs: u32, overhead: OverheadMeasurement) !void {
+fn generateResultsMarkdown(allocator: std.mem.Allocator, results: []const BenchmarkResult, _: []const BenchmarkResult, internal_runs: u32, _: OverheadMeasurement) !void {
     const file = try std.fs.cwd().createFile("results.md", .{});
     defer file.close();
 
@@ -438,6 +485,10 @@ fn generateResultsMarkdown(allocator: std.mem.Allocator, results: []const Benchm
     const runs_note = try std.fmt.allocPrint(allocator, "_Times shown are per-execution averages from {} internal runs per benchmark._\n\n", .{internal_runs});
     defer allocator.free(runs_note);
     try file.writeAll(runs_note);
+
+    // Write table header
+    try file.writeAll("| Benchmark                        | REVM (ms)   | ethrex (ms) | Guillotine (ms) | Guillotine-Rust (ms) | Guillotine-Bun (ms) | Guillotine-Python (ms) | Guillotine-Go (ms) | Fastest           |\n");
+    try file.writeAll("|----------------------------------|-------------|-------------|-----------------|----------------------|---------------------|------------------------|--------------------|-----------------|\n");
 
     for (results) |res| {
         // Find fastest
@@ -466,6 +517,9 @@ fn generateResultsMarkdown(allocator: std.mem.Allocator, results: []const Benchm
         if (res.guillotine_go_mean < fastest_time) {
             fastest = "Guillotine-Go";
             fastest_time = res.guillotine_go_mean;
+        }
+
+        const row = try std.fmt.allocPrint(allocator, "| {s:32} | {d:>11.2} | {d:>11.2} | {d:>11.2} | {d:>11.2} | {d:>11.2} | {d:>11.2} | {d:>11.2} | {s:17} |\n", .{
             res.name,
             res.revm_mean,
             res.ethrex_mean,
@@ -500,6 +554,23 @@ fn generateResultsMarkdown(allocator: std.mem.Allocator, results: []const Benchm
     }
 
     const n = @as(f64, @floatFromInt(results.len));
+    const summary = try std.fmt.allocPrint(allocator, "\n## Summary\n\n" ++
+        "Average execution time per benchmark:\n" ++
+        "- REVM: {:.2}ms\n" ++
+        "- ethrex: {:.2}ms\n" ++
+        "- Guillotine: {:.2}ms\n" ++
+        "- Guillotine Rust: {:.2}ms\n" ++
+        "- Guillotine Bun: {:.2}ms\n" ++
+        "- Guillotine Python: {:.2}ms\n" ++
+        "- Guillotine Go: {:.2}ms\n", .{
+        total_revm / n,
+        total_ethrex / n,
+        total_guillotine / n,
+        total_guillotine_rust / n,
+        total_guillotine_bun / n,
+        total_guillotine_python / n,
+        total_guillotine_go / n,
+    });
     defer allocator.free(summary);
     try file.writeAll(summary);
 
@@ -523,15 +594,15 @@ fn runBenchmarkForFixture(allocator: std.mem.Allocator, fixture_data: fixture.Fi
 
     // Prepare commands for REVM, ethrex, and guillotine runners with internal runs
     const revm_cmd = if (fixture_data.calldata.len > 0 and !std.mem.eql(u8, fixture_data.calldata, ""))
-        try std.fmt.allocPrint(allocator, "./target/release/evm-runner --evm revm --bytecode {s} --calldata {s} --gas-limit {} --internal-runs {}", .{ bytecode, fixture_data.calldata, fixture_data.gas_limit, internal_runs })
+        try std.fmt.allocPrint(allocator, "./target/release/revm_runner --evm revm --bytecode {s} --calldata {s} --gas-limit {} --internal-runs {}", .{ bytecode, fixture_data.calldata, fixture_data.gas_limit, internal_runs })
     else
-        try std.fmt.allocPrint(allocator, "./target/release/evm-runner --evm revm --bytecode {s} --gas-limit {} --internal-runs {}", .{ bytecode, fixture_data.gas_limit, internal_runs });
+        try std.fmt.allocPrint(allocator, "./target/release/revm_runner --evm revm --bytecode {s} --gas-limit {} --internal-runs {}", .{ bytecode, fixture_data.gas_limit, internal_runs });
     defer allocator.free(revm_cmd);
 
     const ethrex_cmd = if (fixture_data.calldata.len > 0 and !std.mem.eql(u8, fixture_data.calldata, ""))
-        try std.fmt.allocPrint(allocator, "./target/release/evm-runner --evm ethrex --bytecode {s} --calldata {s} --gas-limit {} --internal-runs {}", .{ bytecode, fixture_data.calldata, fixture_data.gas_limit, internal_runs })
+        try std.fmt.allocPrint(allocator, "./target/release/revm_runner --evm ethrex --bytecode {s} --calldata {s} --gas-limit {} --internal-runs {}", .{ bytecode, fixture_data.calldata, fixture_data.gas_limit, internal_runs })
     else
-        try std.fmt.allocPrint(allocator, "./target/release/evm-runner --evm ethrex --bytecode {s} --gas-limit {} --internal-runs {}", .{ bytecode, fixture_data.gas_limit, internal_runs });
+        try std.fmt.allocPrint(allocator, "./target/release/revm_runner --evm ethrex --bytecode {s} --gas-limit {} --internal-runs {}", .{ bytecode, fixture_data.gas_limit, internal_runs });
     defer allocator.free(ethrex_cmd);
 
     const guillotine_cmd = if (fixture_data.calldata.len > 0 and !std.mem.eql(u8, fixture_data.calldata, ""))
@@ -558,6 +629,11 @@ fn runBenchmarkForFixture(allocator: std.mem.Allocator, fixture_data: fixture.Fi
         try std.fmt.allocPrint(allocator, "./zig-out/bin/guillotine-go-runner --bytecode {s} --gas-limit {} --internal-runs {}", .{ bytecode, fixture_data.gas_limit, internal_runs });
     defer allocator.free(guillotine_go_cmd);
 
+    const guillotine_rust_cmd = if (fixture_data.calldata.len > 0 and !std.mem.eql(u8, fixture_data.calldata, ""))
+        try std.fmt.allocPrint(allocator, "./target/release/guillotine_runner {s} {s} {}", .{ bytecode, fixture_data.calldata, fixture_data.gas_limit })
+    else
+        try std.fmt.allocPrint(allocator, "./target/release/guillotine_runner {s} \"\" {}", .{ bytecode, fixture_data.gas_limit });
+    defer allocator.free(guillotine_rust_cmd);
 
     // Build hyperfine command to compare implementations
     var hyperfine_args: std.ArrayList([]const u8) = .empty;
@@ -598,7 +674,6 @@ fn runBenchmarkForFixture(allocator: std.mem.Allocator, fixture_data: fixture.Fi
     try hyperfine_args.append(allocator, "-n");
     try hyperfine_args.append(allocator, "guillotine-go");
     try hyperfine_args.append(allocator, guillotine_go_cmd);
-    try hyperfine_args.append(allocator, "-n");
 
     // Execute hyperfine
     var child = std.process.Child.init(hyperfine_args.items, allocator);
@@ -750,6 +825,20 @@ pub fn main() !void {
         var results: std.ArrayList(BenchmarkResult) = .empty;
         try results.ensureTotalCapacity(allocator, 20);
         defer results.deinit(allocator);
+
+        var raw_results: std.ArrayList(BenchmarkResult) = .empty;
+        try raw_results.ensureTotalCapacity(allocator, 20);
+        defer raw_results.deinit(allocator);
+
+        // Measure startup overhead once for all benchmarks
+        var overhead_measurement: ?OverheadMeasurement = null;
+        if (generate_results) {
+            try print_writer.interface.print("\nMeasuring startup overhead before benchmarks...\n", .{});
+            try print_writer.interface.flush();
+            // Use a minimal bytecode for overhead measurement
+            const minimal_bytecode = "0x6000";
+            overhead_measurement = try measureStartupOverhead(allocator, minimal_bytecode);
+        }
 
         // Process all JSON fixtures
         var iter = dir.iterate();
