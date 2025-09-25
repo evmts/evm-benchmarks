@@ -186,7 +186,7 @@ pub fn build(b: *std.Build) void {
     // Make the executable depend on the Cargo build, Bun SDK, and all runner builds
     exe.step.dependOn(&cargo_build.step);
     exe.step.dependOn(&guillotine_bun_build.step);
-    // exe.step.dependOn(&go_build.step); // Temporarily disabled - Go import issue
+    exe.step.dependOn(&go_build.step);
     exe.step.dependOn(&geth_runner_build.step);
     exe.step.dependOn(&py_evm_setup.step);
     exe.step.dependOn(&ethereumjs_setup.step);
