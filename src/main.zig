@@ -500,8 +500,8 @@ fn generateResultsMarkdown(allocator: std.mem.Allocator, results: []const Benchm
     try file.writeAll(runs_note);
 
     // Write table header
-    try file.writeAll("| Benchmark                        | REVM (ms)   | ethrex (ms) | Guillotine (ms) | Guillotine-Rust (ms) | Guillotine-Bun (ms) | Guillotine-Python (ms) | Guillotine-Go (ms) | Geth (ms)   | Fastest           |\n");
-    try file.writeAll("|----------------------------------|-------------|-------------|-----------------|----------------------|---------------------|------------------------|--------------------|-------------|------------------|\n");
+    try file.writeAll("| Benchmark                        | Guillotine (ms) | REVM (ms)   | ethrex (ms) | Guillotine-Rust (ms) | Geth (ms)   | Guillotine-Go (ms) | Guillotine-Bun (ms) | Guillotine-Python (ms) | Fastest           |\n");
+    try file.writeAll("|----------------------------------|-----------------|-------------|-------------|----------------------|-------------|--------------------|---------------------|------------------------|-------------------|\n");
 
     // Sort results with priority benchmarks first
     const sorted_results = try allocator.alloc(BenchmarkResult, results.len);
@@ -599,14 +599,14 @@ fn generateResultsMarkdown(allocator: std.mem.Allocator, results: []const Benchm
 
         const row = try std.fmt.allocPrint(allocator, "| {s:32} | {d:>11.2} | {d:>11.2} | {d:>11.2} | {d:>11.2} | {d:>11.2} | {d:>11.2} | {d:>11.2} | {d:>11.2} | {s:17} |\n", .{
             res.name,
+            res.guillotine_mean,
             res.revm_mean,
             res.ethrex_mean,
-            res.guillotine_mean,
             res.guillotine_rust_mean,
+            res.geth_mean,
+            res.guillotine_go_mean,
             res.guillotine_bun_mean,
             res.guillotine_python_mean,
-            res.guillotine_go_mean,
-            res.geth_mean,
             fastest,
         });
         defer allocator.free(row);
@@ -637,22 +637,22 @@ fn generateResultsMarkdown(allocator: std.mem.Allocator, results: []const Benchm
     const n = @as(f64, @floatFromInt(results.len));
     const summary = try std.fmt.allocPrint(allocator, "\n## Summary\n\n" ++
         "Average execution time per benchmark:\n" ++
+        "- Guillotine: {:.2}ms\n" ++
         "- REVM: {:.2}ms\n" ++
         "- ethrex: {:.2}ms\n" ++
-        "- Guillotine: {:.2}ms\n" ++
         "- Guillotine Rust: {:.2}ms\n" ++
-        "- Guillotine Bun: {:.2}ms\n" ++
-        "- Guillotine Python: {:.2}ms\n" ++
+        "- Geth: {:.2}ms\n" ++
         "- Guillotine Go: {:.2}ms\n" ++
-        "- Geth: {:.2}ms\n", .{
+        "- Guillotine Bun: {:.2}ms\n" ++
+        "- Guillotine Python: {:.2}ms\n", .{
+        total_guillotine / n,
         total_revm / n,
         total_ethrex / n,
-        total_guillotine / n,
         total_guillotine_rust / n,
+        total_geth / n,
+        total_guillotine_go / n,
         total_guillotine_bun / n,
         total_guillotine_python / n,
-        total_guillotine_go / n,
-        total_geth / n,
     });
     defer allocator.free(summary);
     try file.writeAll(summary);
