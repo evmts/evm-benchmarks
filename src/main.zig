@@ -858,6 +858,9 @@ pub fn main() !void {
             for (results.items) |result| {
                 allocator.free(result.name);
             }
+            for (raw_results.items) |result| {
+                allocator.free(result.name);
+            }
         }
     }
 }
