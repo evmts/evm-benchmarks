@@ -555,36 +555,46 @@ fn generateResultsMarkdown(allocator: std.mem.Allocator, results: []const Benchm
     std.sort.insertion(BenchmarkResult, sorted_results, ctx, Context.lessThan);
 
     for (sorted_results) |res| {
-        // Find fastest
-        var fastest: []const u8 = "REVM";
-        var fastest_time = res.revm_mean;
-        if (res.ethrex_mean < fastest_time) {
+        // Find fastest (excluding 0 values which indicate failures)
+        var fastest: []const u8 = "";
+        var fastest_time: f64 = std.math.inf(f64);
+
+        if (res.revm_mean > 0 and res.revm_mean < fastest_time) {
+            fastest = "REVM";
+            fastest_time = res.revm_mean;
+        }
+        if (res.ethrex_mean > 0 and res.ethrex_mean < fastest_time) {
             fastest = "ethrex";
             fastest_time = res.ethrex_mean;
         }
-        if (res.guillotine_mean < fastest_time) {
+        if (res.guillotine_mean > 0 and res.guillotine_mean < fastest_time) {
             fastest = "Guillotine";
             fastest_time = res.guillotine_mean;
         }
-        if (res.guillotine_rust_mean < fastest_time) {
+        if (res.guillotine_rust_mean > 0 and res.guillotine_rust_mean < fastest_time) {
             fastest = "Guillotine-Rust";
             fastest_time = res.guillotine_rust_mean;
         }
-        if (res.guillotine_bun_mean < fastest_time) {
+        if (res.guillotine_bun_mean > 0 and res.guillotine_bun_mean < fastest_time) {
             fastest = "Guillotine-Bun";
             fastest_time = res.guillotine_bun_mean;
         }
-        if (res.guillotine_python_mean < fastest_time) {
+        if (res.guillotine_python_mean > 0 and res.guillotine_python_mean < fastest_time) {
             fastest = "Guillotine-Python";
             fastest_time = res.guillotine_python_mean;
         }
-        if (res.guillotine_go_mean < fastest_time) {
+        if (res.guillotine_go_mean > 0 and res.guillotine_go_mean < fastest_time) {
             fastest = "Guillotine-Go";
             fastest_time = res.guillotine_go_mean;
         }
-        if (res.geth_mean < fastest_time) {
+        if (res.geth_mean > 0 and res.geth_mean < fastest_time) {
             fastest = "Geth";
             fastest_time = res.geth_mean;
+        }
+
+        // If no valid times found (all failed), mark as N/A
+        if (fastest.len == 0) {
+            fastest = "N/A";
         }
 
         const row = try std.fmt.allocPrint(allocator, "| {s:32} | {d:>11.2} | {d:>11.2} | {d:>11.2} | {d:>11.2} | {d:>11.2} | {d:>11.2} | {d:>11.2} | {d:>11.2} | {s:17} |\n", .{
