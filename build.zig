@@ -15,6 +15,28 @@ pub fn build(b: *std.Build) void {
     // Benchmarks must always use maximum performance optimization
     const optimize = std.builtin.OptimizeMode.ReleaseFast;
 
+    // Build Guillotine - build both shared and static libraries
+    const guillotine_build_cmd = b.addSystemCommand(&[_][]const u8{
+        "zig",
+        "build",
+        "-Doptimize=ReleaseFast",
+    });
+    guillotine_build_cmd.setCwd(b.path("guillotine"));
+    guillotine_build_cmd.step.name = "Build Guillotine shared library";
+
+    // Also build the static library
+    const guillotine_static_cmd = b.addSystemCommand(&[_][]const u8{
+        "zig",
+        "build",
+        "static",
+        "-Doptimize=ReleaseFast",
+    });
+    guillotine_static_cmd.setCwd(b.path("guillotine"));
+    guillotine_static_cmd.step.name = "Build Guillotine static library";
+
+    const guillotine_build = &guillotine_build_cmd.step;
+    guillotine_static_cmd.step.dependOn(guillotine_build);
+
     // Add Cargo build step for Rust-based runners (REVM and Guillotine)
     const cargo_build = b.addSystemCommand(&[_][]const u8{
         "cargo",
@@ -23,6 +45,7 @@ pub fn build(b: *std.Build) void {
     });
     cargo_build.setCwd(b.path("."));
     cargo_build.step.name = "Build Rust runners (REVM & Guillotine)";
+    cargo_build.step.dependOn(&guillotine_static_cmd.step);
 
     // Create a step that other steps can depend on
     const cargo_build_step = b.step("rust-runners", "Build the Rust-based EVM runners");
@@ -34,18 +57,6 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    // Build guillotine submodule first
-    const guillotine_build = b.addSystemCommand(&[_][]const u8{
-        "zig",
-        "build",
-        "--release=fast",
-    });
-    guillotine_build.setCwd(b.path("guillotine"));
-    guillotine_build.step.name = "Build guillotine EVM";
-
-    const guillotine_build_step = b.step("build-guillotine", "Build the guillotine EVM");
-    guillotine_build_step.dependOn(&guillotine_build.step);
-
     // Build guillotine Bun SDK
     const guillotine_bun_build = b.addSystemCommand(&[_][]const u8{
         "bash",
@@ -53,7 +64,7 @@ pub fn build(b: *std.Build) void {
     });
     guillotine_bun_build.setCwd(b.path("guillotine/sdks/bun"));
     guillotine_bun_build.step.name = "Build guillotine Bun SDK";
-    guillotine_bun_build.step.dependOn(&guillotine_build.step); // Needs guillotine built first
+    guillotine_bun_build.step.dependOn(guillotine_build);
 
     const guillotine_bun_build_step = b.step("build-guillotine-bun", "Build the guillotine Bun SDK");
     guillotine_bun_build_step.dependOn(&guillotine_bun_build.step);
@@ -181,7 +192,21 @@ pub fn build(b: *std.Build) void {
     exe.step.dependOn(&ethereumjs_setup.step);
     // Link with guillotine foundry compiler
     exe.root_module.addIncludePath(b.path("guillotine/lib/foundry-compilers"));
-    exe.root_module.addLibraryPath(b.path("guillotine/target/release"));
+    // Determine the correct target directory based on the build target
+    const rust_target_path = if (target.result.os.tag == .macos)
+        if (target.result.cpu.arch == .aarch64)
+            "guillotine/target/aarch64-apple-darwin/release-fast"
+        else
+            "guillotine/target/x86_64-apple-darwin/release-fast"
+    else if (target.result.os.tag == .linux)
+        if (target.result.cpu.arch == .aarch64)
+            "guillotine/target/aarch64-unknown-linux-gnu/release-fast"
+        else
+            "guillotine/target/x86_64-unknown-linux-gnu/release-fast"
+    else
+        "guillotine/target/release";
+
+    exe.root_module.addLibraryPath(b.path(rust_target_path));
     exe.root_module.linkSystemLibrary("foundry_wrapper", .{});
     exe.linkLibC();
 
@@ -309,7 +334,7 @@ pub fn build(b: *std.Build) void {
     guillotine_exe.linkLibC();
 
     // Make sure guillotine is built first
-    guillotine_exe.step.dependOn(&guillotine_build.step);
+    guillotine_exe.step.dependOn(guillotine_build);
 
     b.installArtifact(guillotine_exe);
 
