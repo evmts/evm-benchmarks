@@ -33,14 +33,12 @@ func main() {
 	flag.Parse()
 
 	if bytecodeHex == "" {
-		fmt.Fprintf(os.Stderr, "Error: --bytecode is required\n")
 		os.Exit(1)
 	}
 
 	// Parse inputs
 	bytecode, err := hexToBytes(bytecodeHex)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error parsing bytecode: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -48,41 +46,36 @@ func main() {
 	if calldataHex != "" {
 		calldata, err = hexToBytes(calldataHex)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error parsing calldata: %v\n", err)
 			os.Exit(1)
 		}
 	}
-
-	// Create EVM instance
-	vm, err := evm.New()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error creating EVM: %v\n", err)
-		os.Exit(1)
-	}
-	defer vm.Destroy()
 
 	// Set up addresses
 	senderAddress, _ := primitives.AddressFromHex("0x0000000000000000000000000000000000000001")
 	contractAddress, _ := primitives.AddressFromHex("0x0000000000000000000000000000000000000042")
 
-	// Set sender balance (100 ETH)
-	balance := new(big.Int)
-	balance.SetString("100000000000000000000", 10) // 100 ETH in wei
-	err = vm.SetBalance(senderAddress, balance)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error setting balance: %v\n", err)
-		os.Exit(1)
-	}
-
-	// Deploy contract code
-	err = vm.SetCode(contractAddress, bytecode)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error setting code: %v\n", err)
-		os.Exit(1)
-	}
-
 	// Execute the call multiple times
 	for i := 0; i < internalRuns; i++ {
+		// Create EVM instance inside loop for fresh state each run
+		vm, err := evm.New()
+		if err != nil {
+			os.Exit(1)
+		}
+
+		// Set sender balance (100 ETH)
+		balance := new(big.Int)
+		balance.SetString("100000000000000000000", 10) // 100 ETH in wei
+		err = vm.SetBalance(senderAddress, balance)
+		if err != nil {
+			os.Exit(1)
+		}
+
+		// Deploy contract code
+		err = vm.SetCode(contractAddress, bytecode)
+		if err != nil {
+			os.Exit(1)
+		}
+
 		// Call the contract
 		result, err := vm.Call(evm.Call{
 			Caller: senderAddress,
@@ -93,7 +86,6 @@ func main() {
 		})
 
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error executing call: %v\n", err)
 			os.Exit(1)
 		}
 
@@ -103,5 +95,8 @@ func main() {
 		// Output for each run (matching Zig runner format)
 		fmt.Println(result.Success)
 		fmt.Println(gasUsed)
+		
+		// Clean up
+		vm.Destroy()
 	}
 }

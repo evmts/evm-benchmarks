@@ -48,34 +48,23 @@ fn main() -> Result<()> {
     // Decode hex inputs
     let bytecode = decode_hex(&args.bytecode)?;
     let calldata = decode_hex(&args.calldata)?;
-
-    // Create executor based on choice
-    let mut executor: Box<dyn EvmExecutor> = match args.evm.as_str() {
-        "revm" => Box::new(RevmExecutor::new()?),
-        "ethrex" => Box::new(EthrexExecutor::new()?),
-        _ => {
-            return Err(anyhow::anyhow!("Unknown EVM implementation: {}. Use 'revm' or 'ethrex'.", args.evm));
-        }
-    };
     
     // Execute multiple internal runs
-    let mut last_result = None;
     for _ in 0..args.internal_runs {
+        // Create executor inside loop for fresh state each run
+        let mut executor: Box<dyn EvmExecutor> = match args.evm.as_str() {
+            "revm" => Box::new(RevmExecutor::new()?),
+            "ethrex" => Box::new(EthrexExecutor::new()?),
+            _ => {
+                return Err(anyhow::anyhow!("Unknown EVM implementation: {}. Use 'revm' or 'ethrex'.", args.evm));
+            }
+        };
+        
         let result = executor.execute(bytecode.clone(), calldata.clone(), args.gas_limit)?;
         
         // Output only essential benchmark data for each run
         println!("{}", result.success);
         println!("{}", result.gas_used);
-        
-        // Debug: if failed, show why (only on first failure)
-        if !result.success && last_result.is_none() {
-            eprintln!("Execution failed. Gas used: {}", result.gas_used);
-            if !result.output.is_empty() {
-                eprintln!("Output: 0x{}", hex::encode(&result.output));
-            }
-        }
-        
-        last_result = Some(result);
     }
 
     Ok(())

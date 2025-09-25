@@ -25,7 +25,6 @@ const { values } = parseArgs({
 
 const bytecodeHex = values.bytecode;
 if (!bytecodeHex) {
-  console.error("Error: --bytecode is required");
   process.exit(1);
 }
 
@@ -38,24 +37,25 @@ const calldata = calldataHex && calldataHex.length > 0
   ? hexToBytes(calldataHex) 
   : new Uint8Array(0);
 
-const evm = createEVM({
-  number: 1n,
-  timestamp: 1n,
-  gasLimit: 30_000_000n,
-  coinbase: "0x0000000000000000000000000000000000000000",
-  baseFee: 1_000_000_000n,
-  chainId: 1n,
-  difficulty: 0n,
-});
-
 const senderAddress = "0x0000000000000000000000000000000000000001";
 const contractAddress = "0x0000000000000000000000000000000000000042";
 
-evm.setBalance(senderAddress, 10n ** 20n); // 100 ETH
-
-evm.setCode(contractAddress, bytecode);
-
 for (let i = 0; i < internalRuns; i++) {
+  // Create EVM instance inside loop for fresh state each run
+  const evm = createEVM({
+    number: 1n,
+    timestamp: 1n,
+    gasLimit: 30_000_000n,
+    coinbase: "0x0000000000000000000000000000000000000000",
+    baseFee: 1_000_000_000n,
+    chainId: 1n,
+    difficulty: 0n,
+  });
+
+  evm.setBalance(senderAddress, 10n ** 20n); // 100 ETH
+
+  evm.setCode(contractAddress, bytecode);
+
   const result = evm.call({
     caller: senderAddress,
     to: contractAddress,

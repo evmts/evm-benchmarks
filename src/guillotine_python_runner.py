@@ -28,34 +28,34 @@ def main():
     gas_limit = args.gas_limit
     internal_runs = args.internal_runs
     
-    # Create block info to match the Zig runner
-    block_info = BlockInfo(
-        number=1,
-        timestamp=1, 
-        gas_limit=30000000,
-        coinbase="0x0000000000000000000000000000000000000000",
-        base_fee=1000000000,
-        chain_id=1,
-        difficulty=0,
-        prev_randao=b'\x00' * 32
-    )
-    
-    # Create EVM instance with block info
-    evm = EVM(block_info)
-    
     # Set up addresses
     sender_address = Address.from_hex("0x0000000000000000000000000000000000000001")
     contract_address = Address.from_hex("0x0000000000000000000000000000000000000042")
     
-    # Set sender balance (100 ETH)
-    balance = U256.from_int(100_000_000_000_000_000_000)  # 100 ETH in wei
-    evm.set_balance(sender_address, balance)
-    
-    # Deploy contract code
-    evm.set_code(contract_address, bytecode)
-    
     # Execute the call multiple times
     for _ in range(internal_runs):
+        # Create block info to match the Zig runner
+        block_info = BlockInfo(
+            number=1,
+            timestamp=1, 
+            gas_limit=30000000,
+            coinbase="0x0000000000000000000000000000000000000000",
+            base_fee=1000000000,
+            chain_id=1,
+            difficulty=0,
+            prev_randao=b'\x00' * 32
+        )
+        
+        # Create EVM instance inside loop for fresh state each run
+        evm = EVM(block_info)
+        
+        # Set sender balance (100 ETH)
+        balance = U256.from_int(100_000_000_000_000_000_000)  # 100 ETH in wei
+        evm.set_balance(sender_address, balance)
+        
+        # Deploy contract code
+        evm.set_code(contract_address, bytecode)
+        
         # Create call parameters
         call_params = CallParams(
             caller=sender_address,
@@ -75,9 +75,9 @@ def main():
         # Output for each run (matching Zig runner format)
         print(str(result.success).lower())
         print(gas_used)
-    
-    # Clean up
-    evm.destroy()
+        
+        # Clean up
+        evm.destroy()
 
 if __name__ == "__main__":
     main()
